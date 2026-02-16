@@ -86,19 +86,25 @@ step "2/5  Instalando Claude Hub..."
 
 mkdir -p "$INSTALL_DIR"
 
-# Copia o script principal
-if [ -f "claude-hub.py" ]; then
-    cp claude-hub.py "$INSTALL_DIR/claude-hub.py"
-elif [ -f "$(dirname "$0")/claude-hub.py" ]; then
-    cp "$(dirname "$0")/claude-hub.py" "$INSTALL_DIR/claude-hub.py"
-else
+# Detecta diretório fonte
+SRC_DIR="."
+if [ ! -f "claude-hub.py" ] && [ -f "$(dirname "$0")/claude-hub.py" ]; then
+    SRC_DIR="$(dirname "$0")"
+fi
+
+if [ ! -f "$SRC_DIR/claude-hub.py" ]; then
     warn "claude-hub.py não encontrado no diretório atual!"
     info "Certifique-se de rodar o instalador do mesmo diretório do claude-hub.py"
     exit 1
 fi
 
+# Copia script principal + templates
+cp "$SRC_DIR/claude-hub.py" "$INSTALL_DIR/claude-hub.py"
 chmod +x "$INSTALL_DIR/claude-hub.py"
-ok "Servidor instalado em $INSTALL_DIR"
+
+mkdir -p "$INSTALL_DIR/templates"
+cp "$SRC_DIR/templates/"*.html "$INSTALL_DIR/templates/" 2>/dev/null
+ok "Servidor + templates instalados em $INSTALL_DIR"
 
 # ── 3. Criar LaunchAgent ──
 step "3/5  Configurando inicialização automática..."

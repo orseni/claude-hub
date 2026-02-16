@@ -16,25 +16,28 @@ iPhone/Safari  ←── Tailscale ──→  Mac
                                    └── :77xx  ttyd → tmux → claude (per session)
 ```
 
-- `claude-hub.py` — Single-file HTTP server (stdlib `http.server`). Contains all logic: session management, process control, and inline HTML/CSS rendering. No frameworks, no templates.
+- `claude-hub.py` — HTTP server (stdlib `http.server`). Config, helpers, session management, HTTP handler, CLI.
+- `templates/hub.html` — Dashboard HTML/CSS/JS. Placeholders: `{{SESSION_CARDS}}`, `{{COUNT_TEXT}}`.
+- `templates/terminal.html` — Terminal wrapper HTML/CSS/JS with 2-row virtual keyboard. Placeholders: `{{SESSION_NAME}}`, `{{TERMINAL_URL}}`.
 - `install.sh` — Setup script that installs dependencies (ttyd, tmux via Homebrew), creates a macOS LaunchAgent for autostart, and generates a `ctl.sh` control script at `~/.claude-hub/`.
 
 ### Key code sections in `claude-hub.py`
 
 - **Config** (top): Environment variables, port ranges (7700-7799), paths
-- **Helpers**: `port_for_name()` (deterministic port from session name hash), `get_sessions()` (lists tmux sessions), `start_session()` / `stop_session()`
-- **HTML**: `render_hub()` generates the full dashboard HTML inline (mobile-first, dark theme, glassmorphism). `render_terminal()` generates the terminal wrapper page with iframe + virtual keyboard.
+- **Helpers**: `_load_template()` (loads HTML from `templates/` with cache), `port_for_name()` (deterministic port from session name hash), `get_sessions()` (lists tmux sessions), `start_session()` / `stop_session()`
+- **HTML Rendering**: `render_hub()` loads `templates/hub.html` and replaces placeholders. `render_terminal()` loads `templates/terminal.html` and replaces placeholders.
 - **HTTP Handler**: `HubHandler(BaseHTTPRequestHandler)` with routes: `/`, `/start/{name}`, `/stop/{name}`, `/terminal/{name}`, `/api/sessions`, `/api/ttyd-ready/{name}`, `/api/send-keys/{name}`, `/api/send-text/{name}`, `/api/scroll/{name}`, `/api/folders`
 - **Main**: Server startup with signal handling
 - **CLI**: `cmd_start()`, `cmd_stop()`, `cmd_status()` — subcommands for service control
 
 ## Deployment Workflow
 
-After editing `claude-hub.py`, always deploy with:
+After editing files, always deploy with:
 
 ```bash
 # 1. Copy to production dir
 cp claude-hub.py ~/.claude-hub/claude-hub.py
+cp templates/*.html ~/.claude-hub/templates/
 
 # 2. Kill existing ttyd processes (they keep old config)
 pkill -f "ttyd.*-p 77"
@@ -70,7 +73,8 @@ Production files live at `~/.claude-hub/` (created by `install.sh`).
 - macOS only (uses LaunchAgents via launchd)
 - ttyd version: 1.7.7
 - No tests, no linter, no build step configured
-- All HTML/CSS/JS é inline em `claude-hub.py` — exceto `ttyd-index.html` (custom HTML para ttyd, ~715KB por conter JS bundled)
+- HTML/CSS/JS dos templates fica em `templates/` — `claude-hub.py` carrega com `_load_template()` (cache em memória)
+- `ttyd-index.html` (~715KB) contém JS bundled do ttyd + HTML/CSS custom — editar com Python script ou sed
 - Session names map deterministically to ports via `hashlib.md5` em `port_for_name()`
 - HTTPS via Tailscale certs (Let's Encrypt para `*.ts.net`). SSL context com ciphers ECDHE+AESGCM/CHACHA20
 - ThreadedHTTPServer (ThreadingMixIn) para requests paralelos

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Claude Hub">
+<meta name="theme-color" content="#0c0c0c">
+<title>Claude Hub</title>
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --surface-hover: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e0ddd5;
+    --text-dim: #7a7770;
+    --accent: #E8734A;
+    --accent-glow: rgba(232, 115, 74, 0.12);
+    --danger: #c44;
+    --success: #5a9a5a;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) 16px 100px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 40px 0 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #E8734A, #F4A77A);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .counter {
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--surface);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card:active {
+    transform: scale(0.98);
+    background: var(--surface-hover);
+  }
+
+  .card.card-danger {
+    background: rgba(140, 30, 30, 0.2);
+    border-color: rgba(200, 60, 60, 0.4);
+  }
+
+  .card.card-danger:active {
+    background: rgba(140, 30, 30, 0.3);
+  }
+
+  .card.card-danger .card-name {
+    color: #d07070;
+  }
+
+  .card-link {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    text-decoration: none;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-dot { font-size: 10px; }
+
+  .card-name {
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .card-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .card-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .badge.active {
+    background: rgba(90, 154, 90, 0.15);
+    color: var(--success);
+  }
+
+  .arrow {
+    color: var(--text-dim);
+    font-size: 22px;
+    font-weight: 300;
+  }
+
+  .stop-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 16px 16px 16px 8px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.2s;
+  }
+
+  .stop-btn:hover { color: var(--danger); }
+
+  /* ── Empty State ── */
+  .empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-dim);
+  }
+
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty p { font-size: 16px; }
+  .empty-sub { font-size: 13px; margin-top: 4px; opacity: 0.6; }
+
+  /* ── New Session Form ── */
+  .form-section {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .form-label {
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .form-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+
+  .form-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+  .form-input:focus { border-color: var(--accent); }
+
+  .form-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .form-btn:active {
+    transform: scale(0.96);
+    opacity: 0.9;
+  }
+
+
+  /* ── Quick Actions ── */
+  .quick-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .quick-btn {
+    background: var(--accent-glow);
+    border: 1px solid rgba(124, 131, 255, 0.2);
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s;
+  }
+
+  .quick-btn:active {
+    transform: scale(0.96);
+    background: rgba(212, 148, 58, 0.25);
+  }
+
+  /* ── Folder Picker Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    animation: fadeOverlay 0.25s ease-out;
+  }
+
+  .modal-overlay.active { display: flex; align-items: flex-end; justify-content: center; }
+
+  @keyframes fadeOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 500px;
+    max-height: 85dvh;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin: 10px auto 0;
+    flex-shrink: 0;
+  }
+
+  .modal-header {
+    padding: 16px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .modal-title {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .modal-close {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .modal-close:active { background: var(--surface-hover); }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    padding: 0 20px 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .crumb {
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .crumb:hover { background: var(--surface); }
+  .crumb.current { color: var(--accent); font-weight: 600; }
+  .crumb-sep { color: var(--text-dim); opacity: 0.4; font-size: 11px; }
+
+  /* Folder list */
+  .folder-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .folder-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+    border: none;
+    background: none;
+    color: var(--text);
+    width: 100%;
+    text-align: left;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 15px;
+  }
+
+  .folder-item:active { background: var(--surface-hover); }
+
+  .folder-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-glow);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .folder-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .folder-chevron {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 18px;
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+
+  .folder-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .folder-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  /* Select button */
+  .modal-footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .select-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s;
+  }
+
+  .select-btn:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  .select-path {
+    display: block;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-weight: 400;
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    opacity: 0.5;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card, .form-section { animation: fadeIn 0.3s ease-out backwards; }
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.2s; }
+  .form-section { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">&gt;_ claude hub</span>
+    <span class="counter">{{COUNT_TEXT}}</span>
+  </div>
+  <p class="subtitle">Sessões do Claude Code</p>
+
+  {{SESSION_CARDS}}
+
+  <div class="form-section">
+    <label class="form-label">Nova Sessão</label>
+    <div class="form-row">
+      <input class="form-input" id="session-name" placeholder="nome da sessão" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button class="form-btn" onclick="openFolderPicker()">Criar</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    Claude Hub v2.3 · ttyd + tmux
+  </div>
+
+  <!-- Folder Picker Modal -->
+  <div class="modal-overlay" id="folder-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">Escolher pasta</span>
+        <button class="modal-close" onclick="closeFolderPicker()">✕</button>
+      </div>
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="folder-list" id="folder-list">
+        <div class="folder-loading">Carregando...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="select-btn" id="select-btn" onclick="confirmSelection()">
+          Abrir sessão aqui
+          <span class="select-path" id="select-path"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skip Permissions Popup -->
+  <div class="modal-overlay" id="skip-modal">
+    <div class="modal" style="max-height:auto;">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">Modo de permissões</span>
+        <button class="modal-close" onclick="closeSkipModal()">✕</button>
+      </div>
+      <div style="padding:16px 20px;">
+        <div style="background:rgba(204,68,68,0.08);border:1px solid rgba(204,68,68,0.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:14px;font-weight:600;color:var(--danger);margin-bottom:6px;">--dangerously-skip-permissions</div>
+          <div style="font-size:13px;color:var(--text-dim);line-height:1.4;">
+            O Claude poderá executar comandos, editar e deletar arquivos <strong style="color:var(--danger);">sem pedir confirmação</strong>. Use apenas em projetos que você confia.
+          </div>
+        </div>
+        <button class="select-btn" style="background:var(--danger);margin-bottom:10px;" onclick="launchSession(true)">
+          Sim, pular permissões
+        </button>
+        <button class="select-btn" style="background:var(--accent);" onclick="launchSession(false)">
+          Não, modo normal
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let currentPath = '';
+  let currentAbsolute = '';
+  let sessionName = '';
+
+  function openFolderPicker(name) {
+    const input = document.getElementById('session-name');
+    sessionName = name || input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (!sessionName) {
+      input.focus();
+      input.style.borderColor = 'var(--danger)';
+      setTimeout(() => input.style.borderColor = '', 1500);
+      return;
+    }
+    document.getElementById('folder-modal').classList.add('active');
+    currentPath = '';
+    loadFolders('');
+  }
+
+  function closeFolderPicker() {
+    document.getElementById('folder-modal').classList.remove('active');
+  }
+
+  // Fecha ao clicar fora do modal
+  document.getElementById('folder-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeFolderPicker();
+  });
+
+  async function loadFolders(path) {
+    const list = document.getElementById('folder-list');
+    list.innerHTML = '<div class="folder-loading">Carregando...</div>';
+
+    try {
+      const res = await fetch('/api/folders?path=' + encodeURIComponent(path));
+      const data = await res.json();
+      currentPath = data.current;
+      currentAbsolute = data.absolute;
+
+      // Breadcrumb
+      renderBreadcrumb(data);
+
+      // Select button path
+      const pathDisplay = data.current ? data.root_name + '/' + data.current : data.root_name;
+      document.getElementById('select-path').textContent = '~/' + pathDisplay;
+
+      // Folder list
+      if (data.folders.length === 0) {
+        list.innerHTML = '<div class="folder-empty">Nenhuma subpasta aqui</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      data.folders.forEach(name => {
+        const item = document.createElement('button');
+        item.className = 'folder-item';
+        item.innerHTML = `
+          <span class="folder-icon">📁</span>
+          <span class="folder-name">${name}</span>
+          <span class="folder-chevron">›</span>
+        `;
+        item.onclick = () => {
+          const newPath = data.current ? data.current + '/' + name : name;
+          loadFolders(newPath);
+        };
+        list.appendChild(item);
+      });
+
+      // Scroll to top
+      list.scrollTop = 0;
+    } catch (err) {
+      list.innerHTML = '<div class="folder-empty">Erro ao carregar pastas</div>';
+    }
+  }
+
+  function renderBreadcrumb(data) {
+    const bc = document.getElementById('breadcrumb');
+    bc.innerHTML = '';
+
+    // Root
+    const rootBtn = document.createElement('button');
+    rootBtn.className = 'crumb' + (data.current === '' ? ' current' : '');
+    rootBtn.textContent = data.root_name;
+    rootBtn.onclick = () => loadFolders('');
+    bc.appendChild(rootBtn);
+
+    if (data.current) {
+      const parts = data.current.split('/');
+      let accumulated = '';
+      parts.forEach((part, i) => {
+        const sep = document.createElement('span');
+        sep.className = 'crumb-sep';
+        sep.textContent = '›';
+        bc.appendChild(sep);
+
+        accumulated += (accumulated ? '/' : '') + part;
+        const btn = document.createElement('button');
+        btn.className = 'crumb' + (i === parts.length - 1 ? ' current' : '');
+        btn.textContent = part;
+        const pathForBtn = accumulated;
+        btn.onclick = () => loadFolders(pathForBtn);
+        bc.appendChild(btn);
+      });
+    }
+  }
+
+  function confirmSelection() {
+    // Fecha o folder picker e abre o popup de permissões
+    document.getElementById('folder-modal').classList.remove('active');
+    document.getElementById('skip-modal').classList.add('active');
+  }
+
+  function closeSkipModal() {
+    document.getElementById('skip-modal').classList.remove('active');
+  }
+
+  // Fecha ao clicar fora
+  document.getElementById('skip-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeSkipModal();
+  });
+
+  function launchSession(skip) {
+    const dir = encodeURIComponent(currentAbsolute);
+    const name = encodeURIComponent(sessionName);
+    let url = '/start/' + name + '?dir=' + dir;
+    if (skip) url += '&skip_permissions=1';
+    window.location.href = url;
+  }
+</script>
+</body>
+</html>
