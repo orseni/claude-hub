@@ -1,23 +1,24 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0c0c0c">
+<meta name="theme-color" content="#0a0a0f">
 <title>{{SESSION_NAME}} — Claude Hub</title>
 <style>
   :root {
-    --bg: #0c0c0c;
-    --surface: #161616;
-    --surface-hover: #1e1e1e;
-    --border: #2a2a2a;
-    --text: #e0ddd5;
-    --text-dim: #7a7770;
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface-hover: #1a1a24;
+    --border: #252530;
+    --text: #e4e2db;
+    --text-dim: #6b6a65;
     --accent: #E8734A;
-    --danger: #c44;
-    --success: #5a9a5a;
+    --danger: #e54545;
+    --success: #4ade80;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,7 +28,7 @@
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -69,7 +70,7 @@
   }
 
   .session-name {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
     font-size: 13px;
     font-weight: 600;
     color: var(--text);
@@ -106,7 +107,7 @@
   }
 
   .zoom-level {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
     font-size: 10px;
     color: var(--text-dim);
     min-width: 32px;
@@ -118,13 +119,13 @@
     flex: 1;
     overflow: hidden;
     position: relative;
-    background: #0c0c0c;
+    background: var(--bg);
   }
 
   .terminal-wrap iframe {
     display: block;
     border: none;
-    background: #0c0c0c;
+    background: var(--bg);
     position: absolute;
     inset: 0;
     width: 100%;
@@ -134,7 +135,7 @@
   .loading-overlay {
     position: absolute;
     inset: 0;
-    background: #0c0c0c;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -165,7 +166,7 @@
   .loading-text {
     color: var(--text-dim);
     font-size: 13px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
   }
 
   .direct-link {
@@ -174,7 +175,7 @@
     background: var(--accent);
     color: #fff;
     border-radius: 10px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
@@ -214,7 +215,7 @@
     color: var(--text);
     padding: 9px 11px;
     border-radius: 8px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -222,6 +223,8 @@
     -webkit-tap-highlight-color: transparent;
     transition: all 0.1s;
     flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
   }
 
   .vk-btn:active {
@@ -233,7 +236,7 @@
 
   .vk-btn.danger {
     color: var(--danger);
-    border-color: rgba(204, 68, 68, 0.3);
+    border-color: rgba(229, 69, 69, 0.3);
   }
 
   .vk-btn.danger:active {
@@ -244,7 +247,7 @@
 
   .vk-btn.special {
     color: var(--success);
-    border-color: rgba(90, 154, 90, 0.3);
+    border-color: rgba(74, 222, 128, 0.3);
   }
 
   .vk-btn.special:active {
@@ -271,7 +274,7 @@
     color: var(--text);
     padding: 8px 16px;
     border-radius: 10px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
     font-size: 12px;
     opacity: 0;
     transition: all 0.2s;
@@ -282,6 +285,11 @@
   .toast.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Desktop: hide virtual keyboard ── */
+  @media (hover: hover) and (pointer: fine) {
+    .vk-bar { display: none; }
   }
 </style>
 </head>
@@ -297,8 +305,8 @@
     <div class="terminal-wrap" id="terminal-wrap">
       <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
-        <div class="loading-text">Conectando ao terminal...</div>
-        <a class="direct-link" id="direct-link" style="display:none">Abrir terminal direto</a>
+        <div class="loading-text">Connecting to terminal...</div>
+        <a class="direct-link" id="direct-link" style="display:none">Open terminal directly</a>
       </div>
       <iframe id="terminal" allow="clipboard-read; clipboard-write"></iframe>
     </div>
@@ -330,7 +338,7 @@
         <button class="vk-btn" onclick="sk('C-k')">^K</button>
         <button class="vk-btn" onclick="sk('C-w')">^W</button>
         <div class="vk-sep"></div>
-        <button class="vk-btn special" onclick="pasteClipboard()">Colar</button>
+        <button class="vk-btn special" onclick="pasteClipboard()">Paste</button>
       </div>
     </div>
   </div>
@@ -338,117 +346,116 @@
   <div class="toast" id="toast"></div>
 
 <script>
-  const SESSION = "{{SESSION_NAME}}";
-  const TERMINAL_URL = "{{TERMINAL_URL}}";
+  var SESSION = "{{SESSION_NAME}}";
+  var TERMINAL_URL = "{{TERMINAL_URL}}";
 
-  const iframe = document.getElementById('terminal');
-  const loading = document.getElementById('loading');
-  const loadingText = loading.querySelector('.loading-text');
-  const directLink = document.getElementById('direct-link');
+  var iframe = document.getElementById('terminal');
+  var loading = document.getElementById('loading');
+  var loadingText = loading.querySelector('.loading-text');
+  var directLink = document.getElementById('direct-link');
 
   directLink.href = TERMINAL_URL;
 
-  // iOS: redireciona direto pro ttyd (Safari bloqueia WS cross-origin em iframe)
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  // Mobile detection: iOS needs direct redirect (Safari blocks WS cross-origin in iframes)
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   async function connectTerminal() {
     loading.classList.remove('hidden');
-    loadingText.textContent = 'Conectando ao terminal...';
-    let attempts = 0;
+    loadingText.textContent = 'Connecting to terminal...';
+    var attempts = 0;
     while (true) {
       try {
-        const r = await fetch('/api/ttyd-ready/' + encodeURIComponent(SESSION));
-        const data = await r.json();
+        var r = await fetch('/api/ttyd-ready/' + encodeURIComponent(SESSION));
+        var data = await r.json();
         if (data.ready) break;
       } catch(e) {}
       attempts++;
-      if (attempts > 3) loadingText.textContent = 'Aguardando terminal...';
-      await new Promise(ok => setTimeout(ok, 300));
+      if (attempts > 3) loadingText.textContent = 'Waiting for terminal...';
+      await new Promise(function(ok) { setTimeout(ok, 300); });
     }
     if (isIOS) {
-      // Safari iOS bloqueia WebSocket cross-origin em iframes
-      // Salva no localStorage como fallback (caso hash se perca)
+      // iOS Safari blocks WebSocket cross-origin in iframes.
+      // Redirect directly to ttyd URL (same-origin = WS works).
       try {
         localStorage.setItem('claudeHub_origin', location.origin);
         localStorage.setItem('claudeHub_session', SESSION);
       } catch(e) {}
-      // Redireciona direto pro ttyd (same-origin = WS funciona)
       window.location.replace(TERMINAL_URL + '#hub=' + encodeURIComponent(location.origin) + '&session=' + encodeURIComponent(SESSION));
       return;
     }
+    // Android Chrome and desktop browsers: use iframe
     iframe.src = TERMINAL_URL;
-    iframe.onload = () => loading.classList.add('hidden');
-    setTimeout(() => loading.classList.add('hidden'), 3000);
+    iframe.onload = function() { loading.classList.add('hidden'); };
+    setTimeout(function() { loading.classList.add('hidden'); }, 3000);
   }
 
   connectTerminal();
 
-  // Safari mata WebSocket quando a aba vai pro background — reconecta ao voltar
-  document.addEventListener('visibilitychange', () => {
+  // Browsers may kill WebSocket when tab goes to background — reconnect on resume
+  document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && iframe.src) {
-      // Recarrega o iframe para reconectar o WebSocket
-      const src = iframe.src;
+      var src = iframe.src;
       iframe.src = '';
       loading.classList.remove('hidden');
-      loadingText.textContent = 'Reconectando...';
-      setTimeout(() => {
+      loadingText.textContent = 'Reconnecting...';
+      setTimeout(function() {
         iframe.src = src;
-        iframe.onload = () => loading.classList.add('hidden');
-        setTimeout(() => loading.classList.add('hidden'), 2000);
+        iframe.onload = function() { loading.classList.add('hidden'); };
+        setTimeout(function() { loading.classList.add('hidden'); }, 2000);
       }, 100);
     }
   });
 
   function showToast(msg) {
-    const t = document.getElementById('toast');
+    var t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 800);
+    setTimeout(function() { t.classList.remove('show'); }, 800);
   }
 
   async function sk(key) {
     try {
-      const res = await fetch('/api/send-keys/' + encodeURIComponent(SESSION), {
+      var res = await fetch('/api/send-keys/' + encodeURIComponent(SESSION), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: key })
       });
-      if (!res.ok) showToast('Erro ao enviar tecla');
+      if (!res.ok) showToast('Failed to send key');
     } catch(e) {
-      showToast('Falha na conexão');
+      showToast('Connection failed');
     }
   }
 
   async function sendText(text) {
     try {
-      const res = await fetch('/api/send-text/' + encodeURIComponent(SESSION), {
+      var res = await fetch('/api/send-text/' + encodeURIComponent(SESSION), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text })
       });
-      if (!res.ok) showToast('Erro ao enviar texto');
+      if (!res.ok) showToast('Failed to send text');
     } catch(e) {
-      showToast('Falha na conexão');
+      showToast('Connection failed');
     }
   }
 
   async function pasteClipboard() {
     try {
-      const text = await navigator.clipboard.readText();
-      if (!text) { showToast('Clipboard vazio'); return; }
-      const res = await fetch('/api/send-text/' + encodeURIComponent(SESSION), {
+      var text = await navigator.clipboard.readText();
+      if (!text) { showToast('Clipboard empty'); return; }
+      var res = await fetch('/api/send-text/' + encodeURIComponent(SESSION), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text })
       });
       if (res.ok) {
-        showToast('Colado!');
+        showToast('Pasted!');
       } else {
-        showToast('Erro ao colar');
+        showToast('Failed to paste');
       }
     } catch(e) {
-      showToast('Sem acesso ao clipboard');
+      showToast('No clipboard access');
     }
   }
 
@@ -460,7 +467,7 @@
         body: JSON.stringify({ direction: dir })
       });
     } catch(e) {
-      showToast('Erro no scroll');
+      showToast('Scroll error');
     }
   }
 </script>

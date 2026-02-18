@@ -1,83 +1,125 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Claude Hub">
-<meta name="theme-color" content="#0c0c0c">
+<meta name="theme-color" content="#0a0a0f">
 <title>Claude Hub</title>
 <link rel="apple-touch-icon" href="/icon.png">
 <style>
   :root {
-    --bg: #0c0c0c;
-    --surface: #161616;
-    --surface-hover: #1e1e1e;
-    --border: #2a2a2a;
-    --text: #e0ddd5;
-    --text-dim: #7a7770;
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface-hover: #1a1a24;
+    --border: #252530;
+    --text: #e4e2db;
+    --text-dim: #6b6a65;
     --accent: #E8734A;
-    --accent-glow: rgba(232, 115, 74, 0.12);
-    --danger: #c44;
-    --success: #5a9a5a;
-    --radius: 10px;
+    --accent-hover: #f08058;
+    --accent-glow: rgba(232, 115, 74, 0.08);
+    --danger: #e54545;
+    --danger-bg: rgba(229, 69, 69, 0.08);
+    --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.1);
+    --radius: 12px;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     min-height: 100dvh;
     padding: env(safe-area-inset-top) 16px 100px;
+    max-width: 720px;
+    margin: 0 auto;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* ── Header ── */
   .header {
-    padding: 40px 0 8px;
+    padding: 40px 0 6px;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
   }
 
   .logo {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
-    font-size: 26px;
-    font-weight: 600;
-    background: linear-gradient(135deg, #E8734A, #F4A77A);
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+  }
+
+  .logo-prompt {
+    color: var(--accent);
+  }
+
+  .logo-text {
+    background: linear-gradient(135deg, var(--accent), #f4a77a);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -0.5px;
+    background-clip: text;
+  }
+
+  .logo-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 20px;
+    background: var(--accent);
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
   }
 
   .subtitle {
     color: var(--text-dim);
     font-size: 13px;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
 
   .counter {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
-    font-size: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--text-dim);
     background: var(--surface);
-    padding: 4px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
     border: 1px solid var(--border);
+    letter-spacing: 0.5px;
   }
 
   /* ── Cards ── */
+  .sessions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-left: 3px solid var(--text-dim);
     border-radius: var(--radius);
-    margin-bottom: 10px;
     display: flex;
     align-items: center;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
   }
@@ -87,17 +129,13 @@
     background: var(--surface-hover);
   }
 
-  .card.card-danger {
-    background: rgba(140, 30, 30, 0.2);
-    border-color: rgba(200, 60, 60, 0.4);
+  .card.card-active {
+    border-left-color: var(--accent);
   }
 
-  .card.card-danger:active {
-    background: rgba(140, 30, 30, 0.3);
-  }
-
-  .card.card-danger .card-name {
-    color: #d07070;
+  .card.card-idle {
+    border-left-color: var(--text-dim);
+    opacity: 0.85;
   }
 
   .card-link {
@@ -117,12 +155,26 @@
     gap: 12px;
   }
 
-  .status-dot { font-size: 10px; }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.active {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+  }
+
+  .status-dot.idle {
+    background: var(--text-dim);
+  }
 
   .card-name {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text);
   }
 
@@ -140,60 +192,67 @@
 
   .badge {
     font-size: 11px;
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 20px;
     font-weight: 500;
+    letter-spacing: 0.3px;
   }
 
   .badge.active {
-    background: rgba(90, 154, 90, 0.15);
+    background: var(--success-bg);
     color: var(--success);
   }
 
   .arrow {
     color: var(--text-dim);
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 300;
+    opacity: 0.6;
   }
 
   .stop-btn {
     background: none;
     border: none;
     color: var(--text-dim);
-    font-size: 14px;
     padding: 16px 16px 16px 8px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: color 0.2s;
+    display: flex;
+    align-items: center;
   }
 
-  .stop-btn:hover { color: var(--danger); }
+  .stop-btn:hover, .stop-btn:active { color: var(--danger); }
 
   /* ── Empty State ── */
   .empty {
     text-align: center;
-    padding: 48px 20px;
+    padding: 56px 20px;
     color: var(--text-dim);
   }
 
-  .empty-icon { font-size: 40px; margin-bottom: 12px; }
-  .empty p { font-size: 16px; }
-  .empty-sub { font-size: 13px; margin-top: 4px; opacity: 0.6; }
+  .empty-icon {
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+
+  .empty p { font-size: 16px; font-weight: 500; }
+  .empty-sub { font-size: 13px; margin-top: 6px; opacity: 0.6; font-weight: 400; }
 
   /* ── New Session Form ── */
   .form-section {
-    margin-top: 24px;
-    padding-top: 24px;
+    margin-top: 28px;
+    padding-top: 28px;
     border-top: 1px solid var(--border);
   }
 
   .form-label {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     color: var(--text-dim);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     display: block;
   }
 
@@ -209,7 +268,7 @@
     border-radius: var(--radius);
     padding: 14px 16px;
     color: var(--text);
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: 15px;
     outline: none;
     transition: border-color 0.2s;
@@ -224,8 +283,8 @@
     color: #fff;
     border: none;
     border-radius: var(--radius);
-    padding: 14px 20px;
-    font-family: -apple-system, system-ui, sans-serif;
+    padding: 14px 24px;
+    font-family: var(--font-sans);
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
@@ -234,37 +293,11 @@
     white-space: nowrap;
   }
 
+  .form-btn:hover { background: var(--accent-hover); }
+
   .form-btn:active {
     transform: scale(0.96);
     opacity: 0.9;
-  }
-
-
-  /* ── Quick Actions ── */
-  .quick-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    flex-wrap: wrap;
-  }
-
-  .quick-btn {
-    background: var(--accent-glow);
-    border: 1px solid rgba(124, 131, 255, 0.2);
-    color: var(--accent);
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
-    font-size: 13px;
-    cursor: pointer;
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.2s;
-  }
-
-  .quick-btn:active {
-    transform: scale(0.96);
-    background: rgba(212, 148, 58, 0.25);
   }
 
   /* ── Folder Picker Modal ── */
@@ -273,10 +306,10 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     z-index: 1000;
-    animation: fadeOverlay 0.25s ease-out;
+    animation: fadeOverlay 0.2s ease-out;
   }
 
   .modal-overlay.active { display: flex; align-items: flex-end; justify-content: center; }
@@ -291,7 +324,7 @@
     border: 1px solid var(--border);
     border-radius: 20px 20px 0 0;
     width: 100%;
-    max-width: 500px;
+    max-width: 540px;
     max-height: 85dvh;
     display: flex;
     flex-direction: column;
@@ -321,7 +354,6 @@
   }
 
   .modal-title {
-    font-family: -apple-system, system-ui, sans-serif;
     font-size: 18px;
     font-weight: 600;
   }
@@ -339,6 +371,7 @@
     align-items: center;
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s;
   }
 
   .modal-close:active { background: var(--surface-hover); }
@@ -354,7 +387,7 @@
   }
 
   .crumb {
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-dim);
     background: none;
@@ -363,6 +396,7 @@
     padding: 4px 6px;
     border-radius: 6px;
     -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
   }
 
   .crumb:hover { background: var(--surface); }
@@ -391,7 +425,7 @@
     color: var(--text);
     width: 100%;
     text-align: left;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-size: 15px;
   }
 
@@ -401,12 +435,22 @@
     width: 40px;
     height: 40px;
     background: var(--accent-glow);
+    border: 1px solid rgba(232, 115, 74, 0.12);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
     flex-shrink: 0;
+  }
+
+  .folder-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--accent);
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .folder-name {
@@ -452,13 +496,15 @@
     border: none;
     border-radius: var(--radius);
     padding: 16px;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: all 0.2s;
   }
+
+  .select-btn:hover { background: var(--accent-hover); }
 
   .select-btn:active {
     transform: scale(0.98);
@@ -468,7 +514,7 @@
   .select-path {
     display: block;
     font-size: 11px;
-    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-weight: 400;
     opacity: 0.7;
     margin-top: 4px;
@@ -476,11 +522,25 @@
 
   /* ── Footer ── */
   .footer {
-    margin-top: 32px;
+    margin-top: 36px;
     text-align: center;
     font-size: 12px;
     color: var(--text-dim);
-    opacity: 0.5;
+    opacity: 0.4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .footer-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    letter-spacing: 0.5px;
   }
 
   /* ── Animations ── */
@@ -495,27 +555,40 @@
   .card:nth-child(3) { animation-delay: 0.15s; }
   .card:nth-child(4) { animation-delay: 0.2s; }
   .form-section { animation-delay: 0.25s; }
+
+  /* ── Desktop responsive ── */
+  @media (min-width: 768px) {
+    body { padding-left: 24px; padding-right: 24px; }
+    .header { padding-top: 48px; }
+    .card { transition: all 0.15s ease; }
+    .card:hover { background: var(--surface-hover); border-color: rgba(232, 115, 74, 0.2); }
+  }
 </style>
 </head>
 <body>
   <div class="header">
-    <span class="logo">&gt;_ claude hub</span>
+    <span class="logo">
+      <span class="logo-prompt">&gt;_ </span><span class="logo-text">claude hub</span><span class="logo-cursor"></span>
+    </span>
     <span class="counter">{{COUNT_TEXT}}</span>
   </div>
-  <p class="subtitle">Sessões do Claude Code</p>
+  <p class="subtitle">Claude Code Sessions</p>
 
-  {{SESSION_CARDS}}
+  <div class="sessions-list">
+    {{SESSION_CARDS}}
+  </div>
 
   <div class="form-section">
-    <label class="form-label">Nova Sessão</label>
+    <label class="form-label">New Session</label>
     <div class="form-row">
-      <input class="form-input" id="session-name" placeholder="nome da sessão" autocapitalize="none" autocorrect="off" spellcheck="false">
-      <button class="form-btn" onclick="openFolderPicker()">Criar</button>
+      <input class="form-input" id="session-name" placeholder="session name" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button class="form-btn" onclick="openFolderPicker()">Create</button>
     </div>
   </div>
 
   <div class="footer">
-    Claude Hub v2.3 · ttyd + tmux
+    Claude Hub v{{VERSION}}
+    <span class="footer-badge">ttyd + tmux</span>
   </div>
 
   <!-- Folder Picker Modal -->
@@ -523,42 +596,42 @@
     <div class="modal">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <span class="modal-title">Escolher pasta</span>
-        <button class="modal-close" onclick="closeFolderPicker()">✕</button>
+        <span class="modal-title">Choose directory</span>
+        <button class="modal-close" onclick="closeFolderPicker()">&times;</button>
       </div>
       <div class="breadcrumb" id="breadcrumb"></div>
       <div class="folder-list" id="folder-list">
-        <div class="folder-loading">Carregando...</div>
+        <div class="folder-loading">Loading...</div>
       </div>
       <div class="modal-footer">
         <button class="select-btn" id="select-btn" onclick="confirmSelection()">
-          Abrir sessão aqui
+          Open session here
           <span class="select-path" id="select-path"></span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Skip Permissions Popup -->
+  <!-- Permission Mode Popup -->
   <div class="modal-overlay" id="skip-modal">
     <div class="modal" style="max-height:auto;">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <span class="modal-title">Modo de permissões</span>
-        <button class="modal-close" onclick="closeSkipModal()">✕</button>
+        <span class="modal-title">Permission mode</span>
+        <button class="modal-close" onclick="closeSkipModal()">&times;</button>
       </div>
       <div style="padding:16px 20px;">
-        <div style="background:rgba(204,68,68,0.08);border:1px solid rgba(204,68,68,0.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
-          <div style="font-size:14px;font-weight:600;color:var(--danger);margin-bottom:6px;">--dangerously-skip-permissions</div>
-          <div style="font-size:13px;color:var(--text-dim);line-height:1.4;">
-            O Claude poderá executar comandos, editar e deletar arquivos <strong style="color:var(--danger);">sem pedir confirmação</strong>. Use apenas em projetos que você confia.
+        <div style="background:var(--danger-bg);border:1px solid rgba(229,69,69,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;">
+          <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px;">--dangerously-skip-permissions</div>
+          <div style="font-size:13px;color:var(--text-dim);line-height:1.5;">
+            Claude will be able to execute commands, edit, and delete files <strong style="color:var(--danger);">without asking for confirmation</strong>. Only use this for projects you fully trust.
           </div>
         </div>
         <button class="select-btn" style="background:var(--danger);margin-bottom:10px;" onclick="launchSession(true)">
-          Sim, pular permissões
+          Yes, skip permissions
         </button>
         <button class="select-btn" style="background:var(--accent);" onclick="launchSession(false)">
-          Não, modo normal
+          No, normal mode
         </button>
       </div>
     </div>
@@ -575,7 +648,7 @@
     if (!sessionName) {
       input.focus();
       input.style.borderColor = 'var(--danger)';
-      setTimeout(() => input.style.borderColor = '', 1500);
+      setTimeout(function() { input.style.borderColor = ''; }, 1500);
       return;
     }
     document.getElementById('folder-modal').classList.add('active');
@@ -587,90 +660,112 @@
     document.getElementById('folder-modal').classList.remove('active');
   }
 
-  // Fecha ao clicar fora do modal
   document.getElementById('folder-modal').addEventListener('click', function(e) {
     if (e.target === this) closeFolderPicker();
   });
 
   async function loadFolders(path) {
-    const list = document.getElementById('folder-list');
-    list.innerHTML = '<div class="folder-loading">Carregando...</div>';
+    var list = document.getElementById('folder-list');
+    list.textContent = '';
+    var loadingDiv = document.createElement('div');
+    loadingDiv.className = 'folder-loading';
+    loadingDiv.textContent = 'Loading...';
+    list.appendChild(loadingDiv);
 
     try {
-      const res = await fetch('/api/folders?path=' + encodeURIComponent(path));
-      const data = await res.json();
+      var res = await fetch('/api/folders?path=' + encodeURIComponent(path));
+      var data = await res.json();
       currentPath = data.current;
       currentAbsolute = data.absolute;
 
-      // Breadcrumb
       renderBreadcrumb(data);
 
-      // Select button path
-      const pathDisplay = data.current ? data.root_name + '/' + data.current : data.root_name;
+      var pathDisplay = data.current ? data.root_name + '/' + data.current : data.root_name;
       document.getElementById('select-path').textContent = '~/' + pathDisplay;
 
-      // Folder list
       if (data.folders.length === 0) {
-        list.innerHTML = '<div class="folder-empty">Nenhuma subpasta aqui</div>';
+        list.textContent = '';
+        var emptyDiv = document.createElement('div');
+        emptyDiv.className = 'folder-empty';
+        emptyDiv.textContent = 'No subdirectories here';
+        list.appendChild(emptyDiv);
         return;
       }
 
-      list.innerHTML = '';
-      data.folders.forEach(name => {
-        const item = document.createElement('button');
+      list.textContent = '';
+      data.folders.forEach(function(name) {
+        var item = document.createElement('button');
         item.className = 'folder-item';
-        item.innerHTML = `
-          <span class="folder-icon">📁</span>
-          <span class="folder-name">${name}</span>
-          <span class="folder-chevron">›</span>
-        `;
-        item.onclick = () => {
-          const newPath = data.current ? data.current + '/' + name : name;
+
+        var icon = document.createElement('span');
+        icon.className = 'folder-icon';
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathEl.setAttribute('d', 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z');
+        svg.appendChild(pathEl);
+        icon.appendChild(svg);
+
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'folder-name';
+        nameSpan.textContent = name;
+
+        var chevron = document.createElement('span');
+        chevron.className = 'folder-chevron';
+        chevron.textContent = '\u203A';
+
+        item.appendChild(icon);
+        item.appendChild(nameSpan);
+        item.appendChild(chevron);
+
+        item.onclick = function() {
+          var newPath = data.current ? data.current + '/' + name : name;
           loadFolders(newPath);
         };
         list.appendChild(item);
       });
 
-      // Scroll to top
       list.scrollTop = 0;
     } catch (err) {
-      list.innerHTML = '<div class="folder-empty">Erro ao carregar pastas</div>';
+      list.textContent = '';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'folder-empty';
+      errDiv.textContent = 'Failed to load directories';
+      list.appendChild(errDiv);
     }
   }
 
   function renderBreadcrumb(data) {
-    const bc = document.getElementById('breadcrumb');
-    bc.innerHTML = '';
+    var bc = document.getElementById('breadcrumb');
+    bc.textContent = '';
 
-    // Root
-    const rootBtn = document.createElement('button');
+    var rootBtn = document.createElement('button');
     rootBtn.className = 'crumb' + (data.current === '' ? ' current' : '');
     rootBtn.textContent = data.root_name;
-    rootBtn.onclick = () => loadFolders('');
+    rootBtn.onclick = function() { loadFolders(''); };
     bc.appendChild(rootBtn);
 
     if (data.current) {
-      const parts = data.current.split('/');
-      let accumulated = '';
-      parts.forEach((part, i) => {
-        const sep = document.createElement('span');
+      var parts = data.current.split('/');
+      var accumulated = '';
+      parts.forEach(function(part, i) {
+        var sep = document.createElement('span');
         sep.className = 'crumb-sep';
-        sep.textContent = '›';
+        sep.textContent = '/';
         bc.appendChild(sep);
 
         accumulated += (accumulated ? '/' : '') + part;
-        const btn = document.createElement('button');
+        var btn = document.createElement('button');
         btn.className = 'crumb' + (i === parts.length - 1 ? ' current' : '');
         btn.textContent = part;
-        const pathForBtn = accumulated;
-        btn.onclick = () => loadFolders(pathForBtn);
+        var pathForBtn = accumulated;
+        btn.onclick = function() { loadFolders(pathForBtn); };
         bc.appendChild(btn);
       });
     }
   }
 
   function confirmSelection() {
-    // Fecha o folder picker e abre o popup de permissões
     document.getElementById('folder-modal').classList.remove('active');
     document.getElementById('skip-modal').classList.add('active');
   }
@@ -679,15 +774,14 @@
     document.getElementById('skip-modal').classList.remove('active');
   }
 
-  // Fecha ao clicar fora
   document.getElementById('skip-modal').addEventListener('click', function(e) {
     if (e.target === this) closeSkipModal();
   });
 
   function launchSession(skip) {
-    const dir = encodeURIComponent(currentAbsolute);
-    const name = encodeURIComponent(sessionName);
-    let url = '/start/' + name + '?dir=' + dir;
+    var dir = encodeURIComponent(currentAbsolute);
+    var name = encodeURIComponent(sessionName);
+    var url = '/start/' + name + '?dir=' + dir;
     if (skip) url += '&skip_permissions=1';
     window.location.href = url;
   }

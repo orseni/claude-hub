@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Claude Hub — Acesse suas sessões do Claude Code pelo celular via Tailscale.
-Um mini servidor web que gerencia sessões ttyd + tmux.
+Claude Hub — Access your Claude Code sessions from any device via Tailscale.
+A lightweight web server that manages ttyd + tmux terminal sessions.
 """
 
 import subprocess
@@ -11,33 +11,83 @@ import signal
 import time
 import json
 import hashlib
+import shutil
+import socket
+import platform as _platform
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import unquote, parse_qs, urlparse
 from datetime import datetime
 
-# ─── Config ───────────────────────────────────────────────────────────────────
+VERSION = "3.0.0"
+
+# ─── Platform Detection ─────────────────────────────────────────────────────
+
+PLATFORM = _platform.system().lower()  # 'darwin', 'linux', 'windows'
+
+IS_WSL = False
+if PLATFORM == "linux":
+    try:
+        with open("/proc/version", "r") as f:
+            IS_WSL = "microsoft" in f.read().lower()
+    except FileNotFoundError:
+        pass
+
+
+def _find_bin(name: str) -> str:
+    """Locate a binary on PATH. Returns the name itself as fallback."""
+    path = shutil.which(name)
+    return path if path else name
+
+
+# ─── Config ──────────────────────────────────────────────────────────────────
+
 HUB_PORT = int(os.environ.get("CLAUDE_HUB_PORT", 7680))
 BASE_PORT = 7700
 MAX_PORT = 7799
-TTYD_BIN = os.environ.get("TTYD_BIN", "/opt/homebrew/bin/ttyd")
-TMUX_BIN = "/opt/homebrew/bin/tmux"
-LSOF_BIN = "/usr/sbin/lsof"
-PKILL_BIN = "/usr/bin/pkill"
-CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
+TTYD_BIN = os.environ.get("TTYD_BIN", _find_bin("ttyd"))
+TMUX_BIN = os.environ.get("TMUX_BIN", _find_bin("tmux"))
+CLAUDE_BIN = os.environ.get("CLAUDE_BIN", _find_bin("claude"))
 FONT_SIZE = int(os.environ.get("CLAUDE_FONT_SIZE", 11))
-DEV_ROOT = os.environ.get("CLAUDE_DEV_ROOT", os.path.expanduser("~/Desenvolvimento"))
+DEV_ROOT = os.environ.get("CLAUDE_DEV_ROOT", os.path.expanduser("~/Projects"))
+INSTALL_DIR = os.environ.get("CLAUDE_HUB_DIR", os.path.expanduser("~/.claude-hub"))
 
 IGNORED_DIRS = {".git", "node_modules", "__pycache__", "venv", ".venv", ".tox",
                 ".mypy_cache", ".pytest_cache", "dist", "build", ".next", ".nuxt"}
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_template_cache = {}
+_template_cache: dict[str, str] = {}
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def _check_dependencies() -> list[str]:
+    """Check that required external tools are installed and return missing ones."""
+    missing = []
+    for name in ("tmux", "ttyd"):
+        if not shutil.which(name):
+            missing.append(name)
+    return missing
+
+
+def _dependency_install_hint(name: str) -> str:
+    """Return platform-specific install instructions for a missing dependency."""
+    hints = {
+        "tmux": {
+            "darwin": "brew install tmux",
+            "linux": "sudo apt install tmux  # or: sudo dnf install tmux / sudo pacman -S tmux",
+        },
+        "ttyd": {
+            "darwin": "brew install ttyd",
+            "linux": "sudo snap install ttyd --classic  # or build from source: https://github.com/tsl0922/ttyd",
+        },
+    }
+    platform_key = "darwin" if PLATFORM == "darwin" else "linux"
+    return hints.get(name, {}).get(platform_key, f"Install {name} and ensure it is on your PATH")
+
 
 def _load_template(name: str) -> str:
-    """Carrega template HTML de templates/ com cache em memória."""
+    """Load an HTML template from templates/ with in-memory caching."""
     if name not in _template_cache:
         path = os.path.join(SCRIPT_DIR, "templates", name)
         with open(path, "r", encoding="utf-8") as f:
@@ -46,19 +96,29 @@ def _load_template(name: str) -> str:
 
 
 def port_for_name(name: str) -> int:
-    """Gera porta determinística baseada no nome (7700-7799)."""
+    """Generate a deterministic port (7700-7799) from a session name."""
     h = int(hashlib.md5(name.encode()).hexdigest(), 16)
     return BASE_PORT + (h % (MAX_PORT - BASE_PORT))
 
 
-def get_ttyd_ports() -> set[int]:
-    """Retorna set de portas onde ttyd está rodando."""
+def _port_in_use_socket(port: int) -> bool:
+    """Check if a port is in use via socket connection attempt."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _get_listening_ports_lsof() -> set[int]:
+    """Get listening ports in 7700-7799 range using lsof (macOS/Linux)."""
+    lsof = shutil.which("lsof")
+    if not lsof:
+        return set()
     try:
         out = subprocess.check_output(
-            [LSOF_BIN, "-iTCP:7700-7799", "-sTCP:LISTEN", "-P", "-n"],
+            [lsof, "-iTCP:7700-7799", "-sTCP:LISTEN", "-P", "-n"],
             text=True, stderr=subprocess.DEVNULL
         )
-        ports = set()
+        ports: set[int] = set()
         for line in out.strip().split("\n"):
             if "LISTEN" in line:
                 for part in line.split():
@@ -69,14 +129,58 @@ def get_ttyd_ports() -> set[int]:
         return set()
 
 
+def _get_listening_ports_ss() -> set[int]:
+    """Get listening ports in 7700-7799 range using ss (Linux)."""
+    ss = shutil.which("ss")
+    if not ss:
+        return set()
+    try:
+        out = subprocess.check_output(
+            [ss, "-tlnH"], text=True, stderr=subprocess.DEVNULL
+        )
+        ports: set[int] = set()
+        for line in out.strip().split("\n"):
+            parts = line.split()
+            for part in parts:
+                if ":" in part:
+                    port_str = part.rsplit(":", 1)[-1]
+                    if port_str.isdigit():
+                        port = int(port_str)
+                        if BASE_PORT <= port <= MAX_PORT:
+                            ports.add(port)
+        return ports
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return set()
+
+
+def get_ttyd_ports() -> set[int]:
+    """Return the set of ports where ttyd is currently listening."""
+    ports = _get_listening_ports_lsof()
+    if not ports and PLATFORM == "linux":
+        ports = _get_listening_ports_ss()
+    return ports
+
+
 def port_in_use(port: int) -> bool:
-    """Checa se uma porta já está em uso."""
-    r = subprocess.run([LSOF_BIN, "-i", f":{port}"], capture_output=True)
-    return r.returncode == 0
+    """Check if a TCP port is currently in use."""
+    lsof = shutil.which("lsof")
+    if lsof:
+        r = subprocess.run([lsof, "-i", f":{port}"], capture_output=True)
+        return r.returncode == 0
+
+    ss = shutil.which("ss")
+    if ss:
+        r = subprocess.run(
+            [ss, "-tlnH", f"sport = :{port}"],
+            capture_output=True, text=True
+        )
+        return bool(r.stdout.strip())
+
+    return _port_in_use_socket(port)
 
 
 def get_sessions() -> list[dict]:
-    """Lista sessões tmux ativas do Claude."""
+    """List active Claude tmux sessions with their status."""
     try:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=2) as ex:
@@ -89,7 +193,7 @@ def get_sessions() -> list[dict]:
             ports_future = ex.submit(get_ttyd_ports)
             out = tmux_future.result(timeout=3)
             ttyd_ports = ports_future.result(timeout=3)
-        sessions = []
+        sessions: list[dict] = []
         for line in out.strip().split("\n"):
             if not line.startswith("claude-"):
                 continue
@@ -115,14 +219,14 @@ def get_sessions() -> list[dict]:
 
 
 def get_folders(rel_path: str = "") -> dict:
-    """Lista subpastas de um caminho relativo ao DEV_ROOT."""
+    """List subdirectories under DEV_ROOT for the folder picker."""
     base = os.path.realpath(DEV_ROOT)
     target = os.path.realpath(os.path.join(base, rel_path)) if rel_path else base
 
     if not target.startswith(base):
         target = base
 
-    folders = []
+    folders: list[str] = []
     try:
         for entry in sorted(os.scandir(target), key=lambda e: e.name.lower()):
             if entry.is_dir() and not entry.name.startswith(".") and entry.name not in IGNORED_DIRS:
@@ -143,8 +247,8 @@ def get_folders(rel_path: str = "") -> dict:
     }
 
 
-def start_session(name: str, directory: str = None, skip_permissions: bool = False) -> int:
-    """Inicia uma sessão tmux + ttyd. Retorna a porta."""
+def start_session(name: str, directory: str | None = None, skip_permissions: bool = False) -> int:
+    """Start a tmux + ttyd session. Returns the assigned port."""
     port = port_for_name(name)
     session = f"claude-{name}"
 
@@ -166,16 +270,27 @@ def start_session(name: str, directory: str = None, skip_permissions: bool = Fal
                        capture_output=True)
 
     if not port_in_use(port):
+        ttyd_cmd = [
+            TTYD_BIN, "-W", "-p", str(port),
+            "--ping-interval", "5",
+            "-t", f"fontSize={FONT_SIZE}",
+            "-t", 'theme={"background":"#0f0f1a","foreground":"#e8e8f0","cursor":"#7c83ff"}',
+            "-t", "titleFixed=Claude Hub",
+        ]
+        # Custom index file for virtual keyboard overlay
+        custom_index = os.path.join(INSTALL_DIR, "ttyd-index.html")
+        if os.path.exists(custom_index):
+            ttyd_cmd += ["-I", custom_index]
+
+        # HTTPS: use certs if available
+        cert_file = os.path.join(INSTALL_DIR, "hub.crt")
+        key_file = os.path.join(INSTALL_DIR, "hub.key")
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            ttyd_cmd += ["-S", "-C", cert_file, "-K", key_file]
+
+        ttyd_cmd += ["tmux", "attach-session", "-t", session]
         subprocess.Popen(
-            [TTYD_BIN, "-W", "-p", str(port),
-             "--ping-interval", "5",
-             "-t", f"fontSize={FONT_SIZE}",
-             "-I", os.path.expanduser("~/.claude-hub/ttyd-index.html"),
-             "-S", "-C", os.path.expanduser("~/.claude-hub/hub.crt"),
-             "-K", os.path.expanduser("~/.claude-hub/hub.key"),
-             "-t", "theme={\"background\":\"#0f0f1a\",\"foreground\":\"#e8e8f0\",\"cursor\":\"#7c83ff\"}",
-             "-t", "titleFixed=Claude Hub",
-             "tmux", "attach-session", "-t", session],
+            ttyd_cmd,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         time.sleep(0.3)
@@ -183,68 +298,91 @@ def start_session(name: str, directory: str = None, skip_permissions: bool = Fal
     return port
 
 
-def stop_session(name: str):
-    """Para ttyd e mata a sessão tmux."""
+def stop_session(name: str) -> None:
+    """Stop ttyd and kill the tmux session."""
     port = port_for_name(name)
     session = f"claude-{name}"
-    subprocess.run([PKILL_BIN, "-f", f"ttyd -p {port}"],
-                   capture_output=True)
+
+    pkill = shutil.which("pkill")
+    if pkill:
+        subprocess.run([pkill, "-f", f"ttyd.*-p {port}"],
+                       capture_output=True)
+    else:
+        # Fallback: find and kill ttyd process via port
+        try:
+            lsof = shutil.which("lsof")
+            if lsof:
+                out = subprocess.check_output(
+                    [lsof, "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL
+                ).strip()
+                for pid_str in out.split("\n"):
+                    if pid_str.isdigit():
+                        os.kill(int(pid_str), signal.SIGTERM)
+        except (subprocess.CalledProcessError, ValueError):
+            pass
+
     subprocess.run([TMUX_BIN, "kill-session", "-t", session],
                    capture_output=True)
 
 
-# ─── HTML Rendering ──────────────────────────────────────────────────────────
+# ─── HTML Rendering ─────────────────────────────────────────────────────────
 
 def render_hub(host: str) -> str:
-    """Renderiza o dashboard com sessões ativas."""
+    """Render the dashboard with active sessions."""
     sessions = get_sessions()
 
     session_cards = ""
     for s in sessions:
-        status_dot = "🟢" if s["has_ttyd"] else "🔵"
-        attached_badge = '<span class="badge active">conectado</span>' if s["attached"] else ""
-        danger_class = " card-danger" if s["name"] == "danguly-skip-perm" else ""
+        status_class = "active" if s["has_ttyd"] else "idle"
+        attached_badge = '<span class="badge active">connected</span>' if s["attached"] else ""
         session_cards += f"""
-        <div class="card{danger_class}">
+        <div class="card">
           <a href="/start/{s['name']}" class="card-link">
             <div class="card-left">
-              <span class="status-dot">{status_dot}</span>
+              <span class="status-dot {status_class}"></span>
               <div>
                 <div class="card-name">{s['name']}</div>
-                <div class="card-meta">porta {s['port']} · {s['time']}</div>
+                <div class="card-meta">port {s['port']} &middot; {s['time']}</div>
               </div>
             </div>
             <div class="card-right">
               {attached_badge}
-              <span class="arrow">›</span>
+              <span class="arrow">&rsaquo;</span>
             </div>
           </a>
-          <button class="stop-btn" onclick="event.preventDefault();if(confirm('Encerrar sessão {s['name']}?'))location='/stop/{s['name']}'">✕</button>
+          <button class="stop-btn" onclick="event.preventDefault();if(confirm('Stop session {s['name']}?'))location='/stop/{s['name']}'">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
         </div>"""
 
     if not sessions:
         session_cards = """
         <div class="empty">
-          <div class="empty-icon">⌨️</div>
-          <p>Nenhuma sessão ativa</p>
-          <p class="empty-sub">Crie uma abaixo para começar</p>
+          <svg class="empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <p>No active sessions</p>
+          <p class="empty-sub">Create one below to get started</p>
         </div>"""
 
     count = len(sessions)
-    count_text = f"{count} sessão ativa" if count == 1 else f"{count} sessões ativas"
+    count_text = f"{count} active session" if count == 1 else f"{count} active sessions"
 
     html = _load_template("hub.html")
-    return html.replace("{{COUNT_TEXT}}", count_text).replace("{{SESSION_CARDS}}", session_cards)
+    return (html
+            .replace("{{COUNT_TEXT}}", count_text)
+            .replace("{{SESSION_CARDS}}", session_cards)
+            .replace("{{VERSION}}", VERSION))
 
 
 def render_terminal(name: str, port: int, host: str) -> str:
-    """Renderiza a página wrapper do terminal."""
+    """Render the terminal wrapper page."""
     terminal_url = f"https://{host}:{port}"
     html = _load_template("terminal.html")
     return html.replace("{{SESSION_NAME}}", name).replace("{{TERMINAL_URL}}", terminal_url)
 
 
-# ─── HTTP Handler ─────────────────────────────────────────────────────────────
+# ─── HTTP Handler ────────────────────────────────────────────────────────────
 
 class HubHandler(BaseHTTPRequestHandler):
     def _cors_headers(self):
@@ -328,9 +466,9 @@ class HubHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"ready": ready, "port": port}).encode())
             return
 
-        # Download certificado SSL
+        # Download SSL certificate
         if path == "/cert":
-            cert_path = os.path.expanduser("~/.claude-hub/hub.crt")
+            cert_path = os.path.join(INSTALL_DIR, "hub.crt")
             if os.path.exists(cert_path):
                 with open(cert_path, "rb") as f:
                     cert_data = f.read()
@@ -356,7 +494,9 @@ class HubHandler(BaseHTTPRequestHandler):
 
         # Icon
         if path == "/icon.png":
-            icon_path = os.path.expanduser("~/.claude-hub/icon_chub.png")
+            icon_path = os.path.join(INSTALL_DIR, "icon_chub.png")
+            if not os.path.exists(icon_path):
+                icon_path = os.path.join(SCRIPT_DIR, "icon_chub.png")
             if os.path.exists(icon_path):
                 with open(icon_path, "rb") as f:
                     icon_data = f.read()
@@ -370,7 +510,7 @@ class HubHandler(BaseHTTPRequestHandler):
                 self.end_headers()
             return
 
-        # Hub page
+        # Hub dashboard
         host = self.headers.get("Host", f"localhost:{HUB_PORT}")
         html = render_hub(host)
         self.send_response(200)
@@ -379,7 +519,7 @@ class HubHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(html.encode())
 
-    def _send_json(self, data, status=200):
+    def _send_json(self, data: dict, status: int = 200):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._cors_headers()
@@ -476,17 +616,36 @@ class HubHandler(BaseHTTPRequestHandler):
         pass
 
 
-# ─── CLI ──────────────────────────────────────────────────────────────────────
+# ─── CLI ─────────────────────────────────────────────────────────────────────
 
 def find_hub_pid() -> int | None:
-    try:
-        out = subprocess.check_output(
-            [LSOF_BIN, "-ti", f":{HUB_PORT}"], text=True, stderr=subprocess.DEVNULL
-        ).strip()
-        if out:
-            return int(out.split("\n")[0])
-    except (subprocess.CalledProcessError, ValueError):
-        pass
+    """Find the PID of a running Claude Hub server on HUB_PORT."""
+    lsof = shutil.which("lsof")
+    if lsof:
+        try:
+            out = subprocess.check_output(
+                [lsof, "-ti", f":{HUB_PORT}"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            if out:
+                return int(out.split("\n")[0])
+        except (subprocess.CalledProcessError, ValueError):
+            pass
+
+    ss = shutil.which("ss")
+    if ss:
+        try:
+            out = subprocess.check_output(
+                [ss, "-tlnpH", f"sport = :{HUB_PORT}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            for line in out.split("\n"):
+                if "pid=" in line:
+                    for part in line.split(","):
+                        if part.startswith("pid="):
+                            return int(part.split("=")[1])
+        except (subprocess.CalledProcessError, ValueError):
+            pass
+
     return None
 
 
@@ -494,49 +653,70 @@ def cmd_stop():
     pid = find_hub_pid()
     if pid:
         os.kill(pid, signal.SIGTERM)
-        print(f"🛑 Claude Hub parado (PID {pid})")
+        print(f"  Claude Hub stopped (PID {pid})")
     else:
-        print("🔴 Claude Hub não está rodando")
-    subprocess.run([PKILL_BIN, "-f", "ttyd -p 77"], capture_output=True)
+        print("  Claude Hub is not running")
+    pkill = shutil.which("pkill")
+    if pkill:
+        subprocess.run([pkill, "-f", "ttyd.*-p 77"], capture_output=True)
 
 
 def cmd_status():
     pid = find_hub_pid()
     if pid:
-        print(f"🟢 Claude Hub rodando (PID {pid}, porta {HUB_PORT})")
+        print(f"  Claude Hub running (PID {pid}, port {HUB_PORT})")
         sessions = get_sessions()
         if sessions:
             for s in sessions:
-                dot = "🟢" if s["has_ttyd"] else "🔵"
-                print(f"   {dot} {s['name']} (porta {s['port']}, {s['time']})")
+                dot = "*" if s["has_ttyd"] else "o"
+                print(f"   [{dot}] {s['name']} (port {s['port']}, {s['time']})")
         else:
-            print("   Nenhuma sessão ativa")
+            print("   No active sessions")
     else:
-        print("🔴 Claude Hub está parado")
+        print("  Claude Hub is stopped")
 
 
 def cmd_start():
+    # Check dependencies before starting
+    missing = _check_dependencies()
+    if missing:
+        print("  Missing required dependencies:")
+        for name in missing:
+            hint = _dependency_install_hint(name)
+            print(f"    - {name}: {hint}")
+        sys.exit(1)
+
     def cleanup(sig, frame):
-        print("\n🛑 Parando Claude Hub...")
+        print("\n  Stopping Claude Hub...")
         sessions = get_sessions()
+        pkill = shutil.which("pkill")
         for s in sessions:
             port = s["port"]
-            subprocess.run([PKILL_BIN, "-f", f"ttyd -p {port}"], capture_output=True)
+            if pkill:
+                subprocess.run([pkill, "-f", f"ttyd.*-p {port}"], capture_output=True)
         sys.exit(0)
 
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
 
+    proto = "http"
+    cert_file = os.path.join(INSTALL_DIR, "hub.crt")
+    key_file = os.path.join(INSTALL_DIR, "hub.key")
+    has_ssl = os.path.exists(cert_file) and os.path.exists(key_file)
+    if has_ssl:
+        proto = "https"
+
+    platform_label = PLATFORM
+    if IS_WSL:
+        platform_label = "wsl"
+
     print(f"""
-╔══════════════════════════════════════════╗
-║          🤖 Claude Hub v2.3             ║
-╠══════════════════════════════════════════╣
-║                                          ║
-║  Local:     http://localhost:{HUB_PORT}        ║
-║  Sessões usam portas {BASE_PORT}-{MAX_PORT}          ║
-║  Ctrl+C para parar                       ║
-║                                          ║
-╚══════════════════════════════════════════╝
+  Claude Hub v{VERSION} ({platform_label})
+
+  {proto}://localhost:{HUB_PORT}
+  Sessions use ports {BASE_PORT}-{MAX_PORT}
+  {"HTTPS enabled" if has_ssl else "HTTPS not configured (optional)"}
+  Press Ctrl+C to stop
 """)
 
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -544,17 +724,14 @@ def cmd_start():
 
     server = ThreadedHTTPServer(("0.0.0.0", HUB_PORT), HubHandler)
 
-    cert_file = os.path.expanduser("~/.claude-hub/hub.crt")
-    key_file = os.path.expanduser("~/.claude-hub/hub.key")
-    if os.path.exists(cert_file) and os.path.exists(key_file):
+    if has_ssl:
         import ssl
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ctx.load_cert_chain(cert_file, key_file)
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:!aNULL:!MD5')
+        ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:!aNULL:!MD5")
         ctx.options |= ssl.OP_NO_COMPRESSION | ssl.OP_CIPHER_SERVER_PREFERENCE
         server.socket = ctx.wrap_socket(server.socket, server_side=True)
-        print("🔒 HTTPS ativado")
 
     server.serve_forever()
 
@@ -573,12 +750,11 @@ def main():
     elif cmd == "start":
         cmd_start()
     elif cmd == "logs":
-        install_dir = os.path.expanduser("~/.claude-hub")
         os.execvp("tail", ["tail", "-f",
-                           f"{install_dir}/hub.log",
-                           f"{install_dir}/hub-error.log"])
+                           os.path.join(INSTALL_DIR, "hub.log"),
+                           os.path.join(INSTALL_DIR, "hub-error.log")])
     else:
-        print("Uso: claude-hub.py {start|stop|restart|status|logs}")
+        print(f"Usage: claude-hub.py {{start|stop|restart|status|logs}}")
         sys.exit(1)
 
 
