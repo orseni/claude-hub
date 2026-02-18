@@ -221,17 +221,23 @@ def get_sessions() -> list[dict]:
 def get_folders(rel_path: str = "") -> dict:
     """List subdirectories under DEV_ROOT for the folder picker."""
     base = os.path.realpath(DEV_ROOT)
+    if not os.path.isdir(base):
+        base = os.path.expanduser("~")
+
     target = os.path.realpath(os.path.join(base, rel_path)) if rel_path else base
 
     if not target.startswith(base):
         target = base
+    if not os.path.isdir(target):
+        target = base
 
     folders: list[str] = []
+
     try:
         for entry in sorted(os.scandir(target), key=lambda e: e.name.lower()):
             if entry.is_dir() and not entry.name.startswith(".") and entry.name not in IGNORED_DIRS:
                 folders.append(entry.name)
-    except PermissionError:
+    except (PermissionError, FileNotFoundError, OSError):
         pass
 
     display_path = os.path.relpath(target, base)
