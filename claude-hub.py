@@ -4,6 +4,7 @@ Claude Hub — Access your Claude Code sessions from any device via Tailscale.
 A lightweight web server that manages ttyd + tmux terminal sessions.
 """
 
+from typing import Optional
 import subprocess
 import os
 import sys
@@ -19,7 +20,7 @@ from socketserver import ThreadingMixIn
 from urllib.parse import unquote, parse_qs, urlparse
 from datetime import datetime
 
-VERSION = "3.0.0"
+VERSION = "3.0.1"
 
 # ─── Platform Detection ─────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ def get_folders(rel_path: str = "") -> dict:
     }
 
 
-def start_session(name: str, directory: str | None = None, skip_permissions: bool = False) -> int:
+def start_session(name: str, directory: Optional[str] = None, skip_permissions: bool = False) -> int:
     """Start a tmux + ttyd session. Returns the assigned port."""
     port = port_for_name(name)
     session = f"claude-{name}"
@@ -624,7 +625,7 @@ class HubHandler(BaseHTTPRequestHandler):
 
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
-def find_hub_pid() -> int | None:
+def find_hub_pid() -> Optional[int]:
     """Find the PID of a running Claude Hub server on HUB_PORT."""
     lsof = shutil.which("lsof")
     if lsof:

@@ -28,6 +28,9 @@ hub.key
 # PID files
 *.pid
 
+# Claude Code local settings
+.claude/
+
 # Editors
 .vscode/
 .idea/
