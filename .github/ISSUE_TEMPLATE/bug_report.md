@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve Claude Hub
+about: Report a bug to help us improve Claude Remote Hub
 title: "[Bug] "
 labels: bug
 assignees: ''
@@ -10,7 +10,7 @@ assignees: ''
 
 - **OS**: (e.g., macOS 14.5, Ubuntu 24.04, WSL2 + Windows 11)
 - **Python version**: (e.g., 3.12.4)
-- **Claude Hub version**: (e.g., 3.0.0)
+- **Claude Remote Hub version**: (e.g., 3.0.0)
 - **Browser**: (e.g., Safari iOS 18, Chrome Android 125, Firefox 126)
 - **ttyd version**: (e.g., 1.7.7)
 
@@ -38,7 +38,7 @@ What actually happened.
 <summary>Server logs</summary>
 
 ```
-Paste relevant output from: claude-hub logs
+Paste relevant output from: claude-remote-hub logs
 ```
 
 </details>

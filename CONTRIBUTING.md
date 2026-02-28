@@ -1,6 +1,6 @@
-# Contributing to Claude Hub
+# Contributing to Claude Remote Hub
 
-Thank you for your interest in contributing to Claude Hub! This guide will help you get started.
+Thank you for your interest in contributing to Claude Remote Hub! This guide will help you get started.
 
 ## Development Environment
 
@@ -16,14 +16,14 @@ Thank you for your interest in contributing to Claude Hub! This guide will help 
 1. Fork the repository and clone your fork:
 
 ```bash
-git clone https://github.com/<your-username>/claude-hub.git
-cd claude-hub
+git clone https://github.com/<your-username>/claude-remote-hub.git
+cd claude-remote-hub
 ```
 
 2. Run locally:
 
 ```bash
-python3 claude-hub.py
+python3 claude-remote-hub.py
 ```
 
 The dashboard will be available at `http://localhost:7680`.
@@ -37,8 +37,8 @@ tailscale cert <your-hostname>.ts.net
 ### Project Structure
 
 ```
-claude-hub/
-├── claude-hub.py          # Main server (config, helpers, HTTP handler, CLI)
+claude-remote-hub/
+├── claude-remote-hub.py          # Main server (config, helpers, HTTP handler, CLI)
 ├── install.sh             # Setup script (Homebrew/apt, LaunchAgent/systemd)
 ├── templates/
 │   ├── hub.html           # Dashboard template
@@ -99,7 +99,7 @@ There is no automated test suite yet (contributions welcome! See [ROADMAP.md](RO
 
 Before submitting a PR, verify:
 
-- [ ] Server starts without errors: `python3 claude-hub.py`
+- [ ] Server starts without errors: `python3 claude-remote-hub.py`
 - [ ] Dashboard loads at `http://localhost:7680`
 - [ ] Sessions can be created and stopped
 - [ ] Terminal connects and renders correctly
@@ -126,4 +126,4 @@ See [ROADMAP.md](ROADMAP.md) for a list of planned features and improvements. So
 
 ## Questions?
 
-Open a [Discussion](https://github.com/claudehub/claude-hub/discussions) or an Issue. We are happy to help!
+Open a [Discussion](https://github.com/claudehub/claude-remote-hub/discussions) or an Issue. We are happy to help!

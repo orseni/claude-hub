@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Claude Hub — Access your Claude Code sessions from any device via Tailscale.
+Claude Remote Hub — Access your Claude Code sessions from any device via Tailscale.
 A lightweight web server that manages ttyd + tmux terminal sessions.
 """
 
@@ -43,7 +43,7 @@ def _find_bin(name: str) -> str:
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-HUB_PORT = int(os.environ.get("CLAUDE_HUB_PORT", 7680))
+HUB_PORT = int(os.environ.get("CLAUDE_REMOTE_HUB_PORT", 7680))
 BASE_PORT = 7700
 MAX_PORT = 7799
 TTYD_BIN = os.environ.get("TTYD_BIN", _find_bin("ttyd"))
@@ -51,7 +51,7 @@ TMUX_BIN = os.environ.get("TMUX_BIN", _find_bin("tmux"))
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", _find_bin("claude"))
 FONT_SIZE = int(os.environ.get("CLAUDE_FONT_SIZE", 11))
 DEV_ROOT = os.environ.get("CLAUDE_DEV_ROOT", os.path.expanduser("~/Projects"))
-INSTALL_DIR = os.environ.get("CLAUDE_HUB_DIR", os.path.expanduser("~/.claude-hub"))
+INSTALL_DIR = os.environ.get("CLAUDE_REMOTE_HUB_DIR", os.path.expanduser("~/.claude-remote-hub"))
 
 IGNORED_DIRS = {".git", "node_modules", "__pycache__", "venv", ".venv", ".tox",
                 ".mypy_cache", ".pytest_cache", "dist", "build", ".next", ".nuxt"}
@@ -282,7 +282,7 @@ def start_session(name: str, directory: Optional[str] = None, skip_permissions: 
             "--ping-interval", "5",
             "-t", f"fontSize={FONT_SIZE}",
             "-t", 'theme={"background":"#0f0f1a","foreground":"#e8e8f0","cursor":"#7c83ff"}',
-            "-t", "titleFixed=Claude Hub",
+            "-t", "titleFixed=Claude Remote Hub",
         ]
         # Custom index file for virtual keyboard overlay
         custom_index = os.path.join(INSTALL_DIR, "ttyd-index.html")
@@ -481,7 +481,7 @@ class HubHandler(BaseHTTPRequestHandler):
                     cert_data = f.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/x-x509-ca-cert")
-                self.send_header("Content-Disposition", "attachment; filename=claude-hub.crt")
+                self.send_header("Content-Disposition", "attachment; filename=claude-remote-hub.crt")
                 self.end_headers()
                 self.wfile.write(cert_data)
             else:
@@ -626,7 +626,7 @@ class HubHandler(BaseHTTPRequestHandler):
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 def find_hub_pid() -> Optional[int]:
-    """Find the PID of a running Claude Hub server on HUB_PORT."""
+    """Find the PID of a running Claude Remote Hub server on HUB_PORT."""
     lsof = shutil.which("lsof")
     if lsof:
         try:
@@ -660,9 +660,9 @@ def cmd_stop():
     pid = find_hub_pid()
     if pid:
         os.kill(pid, signal.SIGTERM)
-        print(f"  Claude Hub stopped (PID {pid})")
+        print(f"  Claude Remote Hub stopped (PID {pid})")
     else:
-        print("  Claude Hub is not running")
+        print("  Claude Remote Hub is not running")
     pkill = shutil.which("pkill")
     if pkill:
         subprocess.run([pkill, "-f", "ttyd.*-p 77"], capture_output=True)
@@ -671,7 +671,7 @@ def cmd_stop():
 def cmd_status():
     pid = find_hub_pid()
     if pid:
-        print(f"  Claude Hub running (PID {pid}, port {HUB_PORT})")
+        print(f"  Claude Remote Hub running (PID {pid}, port {HUB_PORT})")
         sessions = get_sessions()
         if sessions:
             for s in sessions:
@@ -680,7 +680,7 @@ def cmd_status():
         else:
             print("   No active sessions")
     else:
-        print("  Claude Hub is stopped")
+        print("  Claude Remote Hub is stopped")
 
 
 def cmd_start():
@@ -694,7 +694,7 @@ def cmd_start():
         sys.exit(1)
 
     def cleanup(sig, frame):
-        print("\n  Stopping Claude Hub...")
+        print("\n  Stopping Claude Remote Hub...")
         sessions = get_sessions()
         pkill = shutil.which("pkill")
         for s in sessions:
@@ -718,7 +718,7 @@ def cmd_start():
         platform_label = "wsl"
 
     print(f"""
-  Claude Hub v{VERSION} ({platform_label})
+  Claude Remote Hub v{VERSION} ({platform_label})
 
   {proto}://localhost:{HUB_PORT}
   Sessions use ports {BASE_PORT}-{MAX_PORT}
@@ -761,7 +761,7 @@ def main():
                            os.path.join(INSTALL_DIR, "hub.log"),
                            os.path.join(INSTALL_DIR, "hub-error.log")])
     else:
-        print(f"Usage: claude-hub.py {{start|stop|restart|status|logs}}")
+        print(f"Usage: claude-remote-hub.py {{start|stop|restart|status|logs}}")
         sys.exit(1)
 
 

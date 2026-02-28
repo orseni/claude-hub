@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0f">
-<title>{{SESSION_NAME}} — Claude Hub</title>
+<title>{{SESSION_NAME}} — Claude Remote Hub</title>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -378,8 +378,8 @@
       // iOS Safari blocks WebSocket cross-origin in iframes.
       // Redirect directly to ttyd URL (same-origin = WS works).
       try {
-        localStorage.setItem('claudeHub_origin', location.origin);
-        localStorage.setItem('claudeHub_session', SESSION);
+        localStorage.setItem('claudeRemoteHub_origin', location.origin);
+        localStorage.setItem('claudeRemoteHub_session', SESSION);
       } catch(e) {}
       window.location.replace(TERMINAL_URL + '#hub=' + encodeURIComponent(location.origin) + '&session=' + encodeURIComponent(SESSION));
       return;

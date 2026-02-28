@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ss` command fallback** for port detection on Linux (when `lsof` unavailable)
 - **Socket-based fallback** for universal port-in-use detection
 - **`--uninstall` flag** for `install.sh`
-- **Uninstall command** via `claude-hub uninstall`
+- **Uninstall command** via `claude-remote-hub uninstall`
 - Complete open source infrastructure: LICENSE (MIT), CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, ROADMAP.md
 - GitHub issue templates (bug report, feature request) and PR template
 - `.editorconfig` for consistent formatting
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **README completely rewritten** in English with marketing intro, multi-OS guides, architecture diagram, API reference
 - Binary paths now use `shutil.which()` instead of hardcoded `/opt/homebrew/` paths
 - Default `DEV_ROOT` changed from `~/Desenvolvimento` to `~/Projects`
-- Install directory configurable via `CLAUDE_HUB_DIR` environment variable
+- Install directory configurable via `CLAUDE_REMOTE_HUB_DIR` environment variable
 - Type hints added to all public functions
 - Virtual keyboard label "Colar" renamed to "Paste"
 - Dashboard uses safe DOM methods instead of innerHTML

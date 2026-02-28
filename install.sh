@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Claude Hub — Installer
+# Claude Remote Hub — Installer
 # Access Claude Code from any device via Tailscale
 #
 # Usage: bash install.sh
@@ -17,9 +17,9 @@ DIM='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-INSTALL_DIR="$HOME/.claude-hub"
+INSTALL_DIR="$HOME/.claude-remote-hub"
 HUB_PORT=7680
-LABEL="com.claude-hub.server"
+LABEL="com.claude-remote-hub.server"
 
 info()  { echo -e "${BLUE}i${NC}  $1"; }
 ok()    { echo -e "${GREEN}+${NC}  $1"; }
@@ -41,7 +41,7 @@ detect_os() {
             ;;
         *)
             warn "Unsupported operating system: $(uname -s)"
-            echo "  Claude Hub supports macOS, Linux, and Windows (via WSL2)."
+            echo "  Claude Remote Hub supports macOS, Linux, and Windows (via WSL2)."
             exit 1
             ;;
     esac
@@ -63,16 +63,16 @@ detect_os() {
 
 # ── Uninstall ──
 do_uninstall() {
-    step "Uninstalling Claude Hub..."
+    step "Uninstalling Claude Remote Hub..."
 
     # Stop service
     if [ "$OS" = "macos" ]; then
         launchctl unload "$HOME/Library/LaunchAgents/${LABEL}.plist" 2>/dev/null || true
         rm -f "$HOME/Library/LaunchAgents/${LABEL}.plist"
     elif [ "$OS" = "linux" ]; then
-        systemctl --user stop claude-hub 2>/dev/null || true
-        systemctl --user disable claude-hub 2>/dev/null || true
-        rm -f "$HOME/.config/systemd/user/claude-hub.service"
+        systemctl --user stop claude-remote-hub 2>/dev/null || true
+        systemctl --user disable claude-remote-hub 2>/dev/null || true
+        rm -f "$HOME/.config/systemd/user/claude-remote-hub.service"
         systemctl --user daemon-reload 2>/dev/null || true
     fi
 
@@ -81,9 +81,9 @@ do_uninstall() {
 
     # Remove files
     rm -rf "$INSTALL_DIR"
-    rm -f /usr/local/bin/claude-hub 2>/dev/null || sudo rm -f /usr/local/bin/claude-hub 2>/dev/null || true
+    rm -f /usr/local/bin/claude-remote-hub 2>/dev/null || sudo rm -f /usr/local/bin/claude-remote-hub 2>/dev/null || true
 
-    ok "Claude Hub has been uninstalled."
+    ok "Claude Remote Hub has been uninstalled."
     exit 0
 }
 
@@ -150,7 +150,7 @@ if [ "${1:-}" = "--uninstall" ]; then
 fi
 
 echo ""
-echo -e "${BOLD}  Claude Hub — Installer${NC}"
+echo -e "${BOLD}  Claude Remote Hub — Installer${NC}"
 echo -e "${DIM}  Platform: ${OS}${NC}"
 echo ""
 
@@ -197,25 +197,25 @@ else
 fi
 
 # ── 2. Install files ──
-step "2/5  Installing Claude Hub..."
+step "2/5  Installing Claude Remote Hub..."
 
 mkdir -p "$INSTALL_DIR"
 
 # Detect source directory
 SRC_DIR="."
-if [ ! -f "claude-hub.py" ] && [ -f "$(dirname "$0")/claude-hub.py" ]; then
+if [ ! -f "claude-remote-hub.py" ] && [ -f "$(dirname "$0")/claude-remote-hub.py" ]; then
     SRC_DIR="$(dirname "$0")"
 fi
 
-if [ ! -f "$SRC_DIR/claude-hub.py" ]; then
-    warn "claude-hub.py not found in current directory!"
-    info "Make sure to run the installer from the claude-hub source directory."
+if [ ! -f "$SRC_DIR/claude-remote-hub.py" ]; then
+    warn "claude-remote-hub.py not found in current directory!"
+    info "Make sure to run the installer from the claude-remote-hub source directory."
     exit 1
 fi
 
 # Copy main script + templates
-cp "$SRC_DIR/claude-hub.py" "$INSTALL_DIR/claude-hub.py"
-chmod +x "$INSTALL_DIR/claude-hub.py"
+cp "$SRC_DIR/claude-remote-hub.py" "$INSTALL_DIR/claude-remote-hub.py"
+chmod +x "$INSTALL_DIR/claude-remote-hub.py"
 
 mkdir -p "$INSTALL_DIR/templates"
 cp "$SRC_DIR/templates/"*.html "$INSTALL_DIR/templates/" 2>/dev/null
@@ -254,7 +254,7 @@ case "$OS" in
     <key>ProgramArguments</key>
     <array>
         <string>${PYTHON_PATH}</string>
-        <string>${INSTALL_DIR}/claude-hub.py</string>
+        <string>${INSTALL_DIR}/claude-remote-hub.py</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -266,7 +266,7 @@ case "$OS" in
         <string>${CLAUDE_PATH}</string>
         <key>HOME</key>
         <string>${HOME}</string>
-        <key>CLAUDE_HUB_PORT</key>
+        <key>CLAUDE_REMOTE_HUB_PORT</key>
         <string>${HUB_PORT}</string>
     </dict>
     <key>RunAtLoad</key>
@@ -287,21 +287,21 @@ PLIST
 
     linux)
         mkdir -p "$HOME/.config/systemd/user"
-        cat > "$HOME/.config/systemd/user/claude-hub.service" << SVCEOF
+        cat > "$HOME/.config/systemd/user/claude-remote-hub.service" << SVCEOF
 [Unit]
-Description=Claude Hub - Claude Code Terminal Server
+Description=Claude Remote Hub - Claude Code Terminal Server
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=${PYTHON_PATH} ${INSTALL_DIR}/claude-hub.py
+ExecStart=${PYTHON_PATH} ${INSTALL_DIR}/claude-remote-hub.py
 Restart=on-failure
 RestartSec=5
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:$(dirname "$CLAUDE_PATH")
 Environment=HOME=${HOME}
 Environment=TTYD_BIN=${TTYD_PATH}
 Environment=CLAUDE_BIN=${CLAUDE_PATH}
-Environment=CLAUDE_HUB_PORT=${HUB_PORT}
+Environment=CLAUDE_REMOTE_HUB_PORT=${HUB_PORT}
 StandardOutput=append:${INSTALL_DIR}/hub.log
 StandardError=append:${INSTALL_DIR}/hub-error.log
 
@@ -310,7 +310,7 @@ WantedBy=default.target
 SVCEOF
 
         systemctl --user daemon-reload
-        systemctl --user enable claude-hub 2>/dev/null || true
+        systemctl --user enable claude-remote-hub 2>/dev/null || true
 
         # Enable lingering so service runs without active login session
         if command -v loginctl &>/dev/null; then
@@ -322,13 +322,13 @@ SVCEOF
 
     wsl)
         info "WSL detected — no daemon service will be created."
-        info "Start manually with: python3 ~/.claude-hub/claude-hub.py"
+        info "Start manually with: python3 ~/.claude-remote-hub/claude-remote-hub.py"
         info "Or add to your shell profile (~/.bashrc or ~/.zshrc)."
         ;;
 esac
 
 # ── 4. Start service ──
-step "4/5  Starting Claude Hub..."
+step "4/5  Starting Claude Remote Hub..."
 
 case "$OS" in
     macos)
@@ -342,17 +342,17 @@ case "$OS" in
         fi
         ;;
     linux)
-        systemctl --user start claude-hub
+        systemctl --user start claude-remote-hub
         sleep 1
-        if systemctl --user is-active claude-hub &>/dev/null; then
+        if systemctl --user is-active claude-remote-hub &>/dev/null; then
             ok "Server running on port ${HUB_PORT}"
         else
             warn "Server may not have started. Check logs:"
-            echo -e "   ${DIM}journalctl --user -u claude-hub -n 20${NC}"
+            echo -e "   ${DIM}journalctl --user -u claude-remote-hub -n 20${NC}"
         fi
         ;;
     wsl)
-        nohup python3 "$INSTALL_DIR/claude-hub.py" > "$INSTALL_DIR/hub.log" 2> "$INSTALL_DIR/hub-error.log" &
+        nohup python3 "$INSTALL_DIR/claude-remote-hub.py" > "$INSTALL_DIR/hub.log" 2> "$INSTALL_DIR/hub-error.log" &
         echo $! > "$INSTALL_DIR/hub.pid"
         sleep 1
         if kill -0 "$(cat "$INSTALL_DIR/hub.pid" 2>/dev/null)" 2>/dev/null; then
@@ -369,8 +369,8 @@ step "5/5  Creating control commands..."
 
 cat > "$INSTALL_DIR/ctl.sh" << 'CTLEOF'
 #!/bin/bash
-LABEL="com.claude-hub.server"
-INSTALL_DIR="$HOME/.claude-hub"
+LABEL="com.claude-remote-hub.server"
+INSTALL_DIR="$HOME/.claude-remote-hub"
 
 # Detect OS
 case "$(uname -s)" in
@@ -391,14 +391,14 @@ case "${1:-status}" in
                 launchctl load "$HOME/Library/LaunchAgents/${LABEL}.plist" 2>/dev/null
                 ;;
             linux)
-                systemctl --user start claude-hub
+                systemctl --user start claude-remote-hub
                 ;;
             wsl)
-                nohup python3 "$INSTALL_DIR/claude-hub.py" > "$INSTALL_DIR/hub.log" 2> "$INSTALL_DIR/hub-error.log" &
+                nohup python3 "$INSTALL_DIR/claude-remote-hub.py" > "$INSTALL_DIR/hub.log" 2> "$INSTALL_DIR/hub-error.log" &
                 echo $! > "$INSTALL_DIR/hub.pid"
                 ;;
         esac
-        echo "  Claude Hub started"
+        echo "  Claude Remote Hub started"
         ;;
     stop)
         case "$OS" in
@@ -406,7 +406,7 @@ case "${1:-status}" in
                 launchctl unload "$HOME/Library/LaunchAgents/${LABEL}.plist" 2>/dev/null
                 ;;
             linux)
-                systemctl --user stop claude-hub
+                systemctl --user stop claude-remote-hub
                 ;;
             wsl)
                 if [ -f "$INSTALL_DIR/hub.pid" ]; then
@@ -416,7 +416,7 @@ case "${1:-status}" in
                 ;;
         esac
         pkill -f "ttyd.*-p 77" 2>/dev/null
-        echo "  Claude Hub stopped"
+        echo "  Claude Remote Hub stopped"
         ;;
     restart)
         "$0" stop && sleep 1 && "$0" start
@@ -428,42 +428,42 @@ case "${1:-status}" in
                 launchctl list "$LABEL" &>/dev/null 2>&1 && running=true
                 ;;
             linux)
-                systemctl --user is-active claude-hub &>/dev/null && running=true
+                systemctl --user is-active claude-remote-hub &>/dev/null && running=true
                 ;;
             wsl)
                 [ -f "$INSTALL_DIR/hub.pid" ] && kill -0 "$(cat "$INSTALL_DIR/hub.pid")" 2>/dev/null && running=true
                 ;;
         esac
         if $running; then
-            echo "  Claude Hub is running"
+            echo "  Claude Remote Hub is running"
             echo ""
             tmux list-sessions -F "   #{session_name}" 2>/dev/null | grep claude || echo "   No active sessions"
         else
-            echo "  Claude Hub is stopped"
+            echo "  Claude Remote Hub is stopped"
         fi
         ;;
     logs)
         tail -f "$INSTALL_DIR/hub.log" "$INSTALL_DIR/hub-error.log"
         ;;
     uninstall)
-        echo "Removing Claude Hub..."
+        echo "Removing Claude Remote Hub..."
         "$0" stop 2>/dev/null
         case "$OS" in
             macos)
                 rm -f "$HOME/Library/LaunchAgents/${LABEL}.plist"
                 ;;
             linux)
-                systemctl --user disable claude-hub 2>/dev/null
-                rm -f "$HOME/.config/systemd/user/claude-hub.service"
+                systemctl --user disable claude-remote-hub 2>/dev/null
+                rm -f "$HOME/.config/systemd/user/claude-remote-hub.service"
                 systemctl --user daemon-reload 2>/dev/null
                 ;;
         esac
         rm -rf "$INSTALL_DIR"
-        rm -f /usr/local/bin/claude-hub 2>/dev/null || sudo rm -f /usr/local/bin/claude-hub 2>/dev/null
-        echo "  Claude Hub removed"
+        rm -f /usr/local/bin/claude-remote-hub 2>/dev/null || sudo rm -f /usr/local/bin/claude-remote-hub 2>/dev/null
+        echo "  Claude Remote Hub removed"
         ;;
     *)
-        echo "Usage: claude-hub {start|stop|restart|status|logs|uninstall}"
+        echo "Usage: claude-remote-hub {start|stop|restart|status|logs|uninstall}"
         ;;
 esac
 CTLEOF
@@ -471,11 +471,11 @@ CTLEOF
 chmod +x "$INSTALL_DIR/ctl.sh"
 
 # Create global symlink
-ln -sf "$INSTALL_DIR/ctl.sh" /usr/local/bin/claude-hub 2>/dev/null || \
-    sudo ln -sf "$INSTALL_DIR/ctl.sh" /usr/local/bin/claude-hub 2>/dev/null || \
+ln -sf "$INSTALL_DIR/ctl.sh" /usr/local/bin/claude-remote-hub 2>/dev/null || \
+    sudo ln -sf "$INSTALL_DIR/ctl.sh" /usr/local/bin/claude-remote-hub 2>/dev/null || \
     warn "Could not create symlink at /usr/local/bin (try running with sudo)"
 
-ok "'claude-hub' command available"
+ok "'claude-remote-hub' command available"
 
 # ── Done ──
 
@@ -486,7 +486,7 @@ if command -v tailscale &>/dev/null; then
 fi
 
 echo ""
-echo -e "${BOLD}  Claude Hub installed successfully!${NC}"
+echo -e "${BOLD}  Claude Remote Hub installed successfully!${NC}"
 echo ""
 echo -e " ${BOLD}Local access:${NC}"
 echo -e "   http://localhost:${HUB_PORT}"
@@ -497,12 +497,12 @@ if [ -n "$TS_HOSTNAME" ]; then
     echo ""
 fi
 echo -e " ${BOLD}Commands:${NC}"
-echo -e "   ${DIM}claude-hub status${NC}     — check status"
-echo -e "   ${DIM}claude-hub stop${NC}       — stop server"
-echo -e "   ${DIM}claude-hub start${NC}      — start server"
-echo -e "   ${DIM}claude-hub restart${NC}    — restart server"
-echo -e "   ${DIM}claude-hub logs${NC}       — view logs"
-echo -e "   ${DIM}claude-hub uninstall${NC}  — uninstall"
+echo -e "   ${DIM}claude-remote-hub status${NC}     — check status"
+echo -e "   ${DIM}claude-remote-hub stop${NC}       — stop server"
+echo -e "   ${DIM}claude-remote-hub start${NC}      — start server"
+echo -e "   ${DIM}claude-remote-hub restart${NC}    — restart server"
+echo -e "   ${DIM}claude-remote-hub logs${NC}       — view logs"
+echo -e "   ${DIM}claude-remote-hub uninstall${NC}  — uninstall"
 echo ""
 echo -e " ${BOLD}Tip:${NC} On your phone, open the link in your browser and"
 echo -e "    use ${DIM}Share > Add to Home Screen${NC} to create an app icon!"

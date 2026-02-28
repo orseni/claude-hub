@@ -2,9 +2,9 @@
 
 ## Security Model
 
-Claude Hub is designed to be accessed exclusively through a [Tailscale](https://tailscale.com) mesh VPN:
+Claude Remote Hub is designed to be accessed exclusively through a [Tailscale](https://tailscale.com) mesh VPN:
 
-- **No ports exposed to the internet** — only devices on your private Tailscale network can reach Claude Hub
+- **No ports exposed to the internet** — only devices on your private Tailscale network can reach Claude Remote Hub
 - **HTTPS support** with TLS 1.2+ and modern cipher suites (ECDHE+AESGCM/CHACHA20) via Tailscale's Let's Encrypt certificates
 - **No additional authentication** — Tailscale already authenticates every device on the network
 - **Sessions run as your OS user** — same permissions as a local terminal session
@@ -33,7 +33,7 @@ The following should be reported to the respective upstream projects:
 
 **Please DO NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, use [GitHub Security Advisories](https://github.com/orseni/claude-hub/security/advisories/new) to report vulnerabilities privately.
+Instead, use [GitHub Security Advisories](https://github.com/orseni/claude-remote-hub/security/advisories/new) to report vulnerabilities privately.
 
 Include in your report:
 

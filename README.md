@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="icon_chub.png" width="120" alt="Claude Hub">
+  <img src="icon_chub.png" width="120" alt="Claude Remote Hub">
 </p>
 
-<h1 align="center">Claude Hub</h1>
+<h1 align="center">Claude Remote Hub</h1>
 
 <p align="center">
   <strong>Access Claude Code from anywhere.</strong><br>
@@ -21,11 +21,11 @@
 
 ---
 
-## Why Claude Hub?
+## Why Claude Remote Hub?
 
 Claude Code runs on your computer. It has access to your files, your git repos, your environment, your SSH keys — everything you need for real development work. But what if you're away from your desk?
 
-**Claude Hub lets you use Claude Code from any device**, without compromising on capabilities:
+**Claude Remote Hub lets you use Claude Code from any device**, without compromising on capabilities:
 
 - **Full power** — It's your real Claude Code CLI, not a web wrapper or limited API. Every tool, every permission, every MCP server.
 - **Your machine** — All files, all repos, all environment variables. Nothing is uploaded to the cloud.
@@ -33,7 +33,7 @@ Claude Code runs on your computer. It has access to your files, your git repos, 
 - **Persistent sessions** — Close your browser, put your phone away. When you come back, everything is exactly where you left it.
 - **Zero dependencies** — Pure Python stdlib. No frameworks, no build step, no node_modules.
 
-Whether you're reviewing a PR on the couch, fixing a bug from a coffee shop, or pair-programming from your phone on the train — Claude Hub gives you the full CLI experience, anywhere.
+Whether you're reviewing a PR on the couch, fixing a bug from a coffee shop, or pair-programming from your phone on the train — Claude Remote Hub gives you the full CLI experience, anywhere.
 
 ## Architecture
 
@@ -41,13 +41,13 @@ Whether you're reviewing a PR on the couch, fixing a bug from a coffee shop, or 
 ┌──────────────┐                              ┌───────────────────────────┐
 │    Phone /   │                              │    Your Computer          │
 │    Tablet /  │ ◄── Tailscale (mesh VPN) ──► │                           │
-│    Browser   │     encrypted tunnel         │  :7680  Claude Hub (web)  │
+│    Browser   │     encrypted tunnel         │  :7680  Claude Remote Hub (web)  │
 └──────────────┘                              │  :77xx  ttyd → tmux       │
                                               │              └─ claude    │
                                               └───────────────────────────┘
 ```
 
-Claude Hub is a lightweight HTTP server that manages terminal sessions:
+Claude Remote Hub is a lightweight HTTP server that manages terminal sessions:
 
 1. You open the dashboard from any device on your Tailscale network
 2. Create a session — it starts `tmux` + `claude` in the background
@@ -60,8 +60,8 @@ Claude Hub is a lightweight HTTP server that manages terminal sessions:
 
 ```bash
 # 1. Clone
-git clone https://github.com/orseni/claude-hub.git
-cd claude-hub
+git clone https://github.com/orseni/claude-remote-hub.git
+cd claude-remote-hub
 
 # 2. Install (auto-detects your OS)
 bash install.sh
@@ -85,18 +85,18 @@ bash install.sh
 ### macOS
 
 ```bash
-git clone https://github.com/orseni/claude-hub.git
-cd claude-hub
+git clone https://github.com/orseni/claude-remote-hub.git
+cd claude-remote-hub
 bash install.sh
 ```
 
-The installer uses Homebrew to install `tmux` and `ttyd`, creates a LaunchAgent for autostart, and sets up the `claude-hub` command.
+The installer uses Homebrew to install `tmux` and `ttyd`, creates a LaunchAgent for autostart, and sets up the `claude-remote-hub` command.
 
 ### Linux (Ubuntu/Debian, Fedora, Arch)
 
 ```bash
-git clone https://github.com/orseni/claude-hub.git
-cd claude-hub
+git clone https://github.com/orseni/claude-remote-hub.git
+cd claude-remote-hub
 bash install.sh
 ```
 
@@ -109,17 +109,17 @@ The installer auto-detects your package manager (`apt`, `dnf`, `pacman`), instal
 3. Inside WSL:
 
 ```bash
-git clone https://github.com/orseni/claude-hub.git
-cd claude-hub
+git clone https://github.com/orseni/claude-remote-hub.git
+cd claude-remote-hub
 bash install.sh
 ```
 
-> **Note:** On WSL, Claude Hub runs as a foreground process (no daemon). Add it to your `~/.bashrc` for auto-start, or run manually.
+> **Note:** On WSL, Claude Remote Hub runs as a foreground process (no daemon). Add it to your `~/.bashrc` for auto-start, or run manually.
 
 ### Uninstall
 
 ```bash
-claude-hub uninstall
+claude-remote-hub uninstall
 # or
 bash install.sh --uninstall
 ```
@@ -145,15 +145,15 @@ Tailscale provides free HTTPS certificates via Let's Encrypt for all `*.ts.net` 
 # 2. Generate certificates for your machine
 tailscale cert your-machine.tailnet.ts.net
 
-# 3. Copy to Claude Hub's config directory
-cp your-machine.tailnet.ts.net.crt ~/.claude-hub/hub.crt
-cp your-machine.tailnet.ts.net.key ~/.claude-hub/hub.key
+# 3. Copy to Claude Remote Hub's config directory
+cp your-machine.tailnet.ts.net.crt ~/.claude-remote-hub/hub.crt
+cp your-machine.tailnet.ts.net.key ~/.claude-remote-hub/hub.key
 
 # 4. Restart
-claude-hub restart
+claude-remote-hub restart
 ```
 
-Claude Hub auto-detects the certificates and enables HTTPS + TLS 1.2+ with modern cipher suites.
+Claude Remote Hub auto-detects the certificates and enables HTTPS + TLS 1.2+ with modern cipher suites.
 
 ## Usage
 
@@ -167,7 +167,7 @@ Claude Hub auto-detects the certificates and enables HTTPS + TLS 1.2+ with moder
 
 ### Add to Home Screen
 
-Turn Claude Hub into a full-screen app:
+Turn Claude Remote Hub into a full-screen app:
 
 - **iOS**: Share → Add to Home Screen
 - **Android**: Menu (⋮) → Add to Home Screen
@@ -175,12 +175,12 @@ Turn Claude Hub into a full-screen app:
 ### CLI Commands
 
 ```bash
-claude-hub start       # Start the server
-claude-hub stop        # Stop the server
-claude-hub restart     # Restart
-claude-hub status      # Show status and active sessions
-claude-hub logs        # Tail log files
-claude-hub uninstall   # Remove everything
+claude-remote-hub start       # Start the server
+claude-remote-hub stop        # Stop the server
+claude-remote-hub restart     # Restart
+claude-remote-hub status      # Show status and active sessions
+claude-remote-hub logs        # Tail log files
+claude-remote-hub uninstall   # Remove everything
 ```
 
 ## Configuration
@@ -189,10 +189,10 @@ All settings are optional environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLAUDE_HUB_PORT` | `7680` | Dashboard port |
+| `CLAUDE_REMOTE_HUB_PORT` | `7680` | Dashboard port |
 | `CLAUDE_FONT_SIZE` | `11` | Terminal font size |
 | `CLAUDE_DEV_ROOT` | `~/Projects` | Root directory for the folder picker |
-| `CLAUDE_HUB_DIR` | `~/.claude-hub` | Installation directory |
+| `CLAUDE_REMOTE_HUB_DIR` | `~/.claude-remote-hub` | Installation directory |
 | `TTYD_BIN` | auto-detected | Path to ttyd binary |
 | `TMUX_BIN` | auto-detected | Path to tmux binary |
 | `CLAUDE_BIN` | auto-detected | Path to Claude CLI binary |
@@ -219,8 +219,8 @@ Set these in your shell profile (`~/.bashrc`, `~/.zshrc`) or in the service conf
 ## Project Structure
 
 ```
-claude-hub/
-├── claude-hub.py              # HTTP server (~600 lines, stdlib only)
+claude-remote-hub/
+├── claude-remote-hub.py              # HTTP server (~600 lines, stdlib only)
 ├── templates/
 │   ├── hub.html               # Dashboard (mobile-first, dark theme)
 │   └── terminal.html          # Terminal wrapper + virtual keyboard
@@ -236,8 +236,8 @@ claude-hub/
 **Production** (created by `install.sh`):
 
 ```
-~/.claude-hub/
-├── claude-hub.py              # Server
+~/.claude-remote-hub/
+├── claude-remote-hub.py              # Server
 ├── templates/                 # HTML templates
 ├── ttyd-index.html            # Custom ttyd interface (optional)
 ├── hub.crt / hub.key          # HTTPS certificates (optional)
@@ -248,7 +248,7 @@ claude-hub/
 
 ## Security
 
-Claude Hub's security model relies on **Tailscale network isolation**:
+Claude Remote Hub's security model relies on **Tailscale network isolation**:
 
 - **No ports exposed to the internet** — only devices on your Tailscale network can connect
 - **HTTPS** with Let's Encrypt certificates via Tailscale (TLS 1.2+, ECDHE+AESGCM/CHACHA20)
@@ -264,8 +264,8 @@ See [SECURITY.md](SECURITY.md) for the full security policy and vulnerability re
 <summary><strong>Server won't start</strong></summary>
 
 ```bash
-claude-hub logs
-cat ~/.claude-hub/hub-error.log
+claude-remote-hub logs
+cat ~/.claude-remote-hub/hub-error.log
 ```
 
 Check that all dependencies are installed: `tmux`, `ttyd`, `claude`, `python3`.
@@ -277,7 +277,7 @@ Check that all dependencies are installed: `tmux`, `ttyd`, `claude`, `python3`.
 ```bash
 lsof -i :7680       # or: ss -tlnp sport = :7680
 kill -9 <PID>
-claude-hub restart
+claude-remote-hub restart
 ```
 </details>
 
@@ -339,4 +339,4 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## License
 
-[MIT](LICENSE) — Claude Hub Contributors
+[MIT](LICENSE) — Claude Remote Hub Contributors

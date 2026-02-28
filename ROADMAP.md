@@ -1,6 +1,6 @@
 # Roadmap
 
-Community-driven feature list for Claude Hub. Pick any item and open a PR!
+Community-driven feature list for Claude Remote Hub. Pick any item and open a PR!
 
 ## Planned Features
 
@@ -23,8 +23,8 @@ Community-driven feature list for Claude Hub. Pick any item and open a PR!
 - [ ] **Resource usage display** — show CPU/memory per session
 
 ### Infrastructure
-- [ ] **Docker container** — run Claude Hub in a container for easier deployment
-- [ ] **Homebrew tap** — `brew install claude-hub` for macOS users
+- [ ] **Docker container** — run Claude Remote Hub in a container for easier deployment
+- [ ] **Homebrew tap** — `brew install claude-remote-hub` for macOS users
 - [ ] **Automated test suite** — pytest for the server, Playwright for the UI
 - [ ] **CI/CD pipeline** — GitHub Actions for linting, testing, and releases
 
