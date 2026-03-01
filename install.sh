@@ -155,7 +155,7 @@ echo -e "${DIM}  Platform: ${OS}${NC}"
 echo ""
 
 # ── 1. Check dependencies ──
-step "1/5  Checking dependencies..."
+step "1/6  Checking dependencies..."
 
 # tmux
 if ! command -v tmux &>/dev/null; then
@@ -197,7 +197,7 @@ else
 fi
 
 # ── 2. Install files ──
-step "2/5  Installing Claude Remote Hub..."
+step "2/6  Installing Claude Remote Hub..."
 
 mkdir -p "$INSTALL_DIR"
 
@@ -228,7 +228,7 @@ fi
 ok "Server + templates installed to $INSTALL_DIR"
 
 # ── 3. Set up autostart ──
-step "3/5  Setting up autostart..."
+step "3/6  Setting up autostart..."
 
 TTYD_PATH=$(which ttyd)
 PYTHON_PATH=$(which python3)
@@ -259,7 +259,7 @@ case "$OS" in
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$(dirname "$CLAUDE_PATH")</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:$(dirname "$CLAUDE_PATH")</string>
         <key>TTYD_BIN</key>
         <string>${TTYD_PATH}</string>
         <key>CLAUDE_BIN</key>
@@ -268,6 +268,8 @@ case "$OS" in
         <string>${HOME}</string>
         <key>CLAUDE_REMOTE_HUB_PORT</key>
         <string>${HUB_PORT}</string>
+        <key>CLAUDE_REMOTE_HUB_DIR</key>
+        <string>${INSTALL_DIR}</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -297,11 +299,12 @@ Type=simple
 ExecStart=${PYTHON_PATH} ${INSTALL_DIR}/claude-remote-hub.py
 Restart=on-failure
 RestartSec=5
-Environment=PATH=/usr/local/bin:/usr/bin:/bin:$(dirname "$CLAUDE_PATH")
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin:$(dirname "$CLAUDE_PATH")
 Environment=HOME=${HOME}
 Environment=TTYD_BIN=${TTYD_PATH}
 Environment=CLAUDE_BIN=${CLAUDE_PATH}
 Environment=CLAUDE_REMOTE_HUB_PORT=${HUB_PORT}
+Environment=CLAUDE_REMOTE_HUB_DIR=${INSTALL_DIR}
 StandardOutput=append:${INSTALL_DIR}/hub.log
 StandardError=append:${INSTALL_DIR}/hub-error.log
 
@@ -327,8 +330,41 @@ SVCEOF
         ;;
 esac
 
-# ── 4. Start service ──
-step "4/5  Starting Claude Remote Hub..."
+# ── 4. HTTPS certificates (Tailscale) ──
+step "4/6  Setting up HTTPS certificates..."
+
+CERT_FILE="$INSTALL_DIR/hub.crt"
+KEY_FILE="$INSTALL_DIR/hub.key"
+
+if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+    ok "Certificates already exist"
+elif command -v tailscale &>/dev/null; then
+    TS_HOSTNAME=$(tailscale status --json 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin).get('Self',{}).get('DNSName','');print(d.rstrip('.'))" 2>/dev/null || echo "")
+    if [ -n "$TS_HOSTNAME" ]; then
+        info "Requesting Tailscale HTTPS certificate for $TS_HOSTNAME..."
+        if sudo tailscale cert \
+            --cert-file "$CERT_FILE" \
+            --key-file "$KEY_FILE" \
+            "$TS_HOSTNAME" 2>/dev/null; then
+            # Fix ownership so the hub can read them
+            sudo chown "$(whoami)" "$CERT_FILE" "$KEY_FILE"
+            chmod 644 "$CERT_FILE"
+            chmod 600 "$KEY_FILE"
+            ok "HTTPS certificates installed for $TS_HOSTNAME"
+        else
+            warn "Could not obtain Tailscale certificate."
+            info "You can set it up later: sudo tailscale cert --cert-file $CERT_FILE --key-file $KEY_FILE <hostname>"
+        fi
+    else
+        warn "Tailscale hostname not detected. Skipping HTTPS setup."
+    fi
+else
+    info "Tailscale not installed — HTTPS not configured (optional)."
+    info "The hub will work over HTTP. For HTTPS, install Tailscale and re-run."
+fi
+
+# ── 5. Start service ──
+step "5/6  Starting Claude Remote Hub..."
 
 case "$OS" in
     macos)
@@ -364,8 +400,8 @@ case "$OS" in
         ;;
 esac
 
-# ── 5. Create control script ──
-step "5/5  Creating control commands..."
+# ── 6. Create control script ──
+step "6/6  Creating control commands..."
 
 cat > "$INSTALL_DIR/ctl.sh" << 'CTLEOF'
 #!/bin/bash
@@ -479,21 +515,26 @@ ok "'claude-remote-hub' command available"
 
 # ── Done ──
 
-# Detect Tailscale hostname
-TS_HOSTNAME=""
-if command -v tailscale &>/dev/null; then
-    TS_HOSTNAME=$(tailscale status --json 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin).get('Self',{}).get('DNSName','');print(d.rstrip('.'))" 2>/dev/null || echo "")
-fi
-
 echo ""
 echo -e "${BOLD}  Claude Remote Hub installed successfully!${NC}"
 echo ""
+PROTO="http"
+if [ -f "$INSTALL_DIR/hub.crt" ] && [ -f "$INSTALL_DIR/hub.key" ]; then
+    PROTO="https"
+fi
+
 echo -e " ${BOLD}Local access:${NC}"
-echo -e "   http://localhost:${HUB_PORT}"
+echo -e "   ${PROTO}://localhost:${HUB_PORT}"
 echo ""
-if [ -n "$TS_HOSTNAME" ]; then
+
+# Re-detect Tailscale hostname if not already set
+if [ -z "${TS_HOSTNAME:-}" ] && command -v tailscale &>/dev/null; then
+    TS_HOSTNAME=$(tailscale status --json 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin).get('Self',{}).get('DNSName','');print(d.rstrip('.'))" 2>/dev/null || echo "")
+fi
+
+if [ -n "${TS_HOSTNAME:-}" ]; then
     echo -e " ${BOLD}Tailscale access (mobile):${NC}"
-    echo -e "   ${GREEN}http://${TS_HOSTNAME}:${HUB_PORT}${NC}"
+    echo -e "   ${GREEN}${PROTO}://${TS_HOSTNAME}:${HUB_PORT}${NC}"
     echo ""
 fi
 echo -e " ${BOLD}Commands:${NC}"

@@ -14,13 +14,14 @@ import json
 import hashlib
 import shutil
 import socket
+import glob as _glob
 import platform as _platform
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import unquote, parse_qs, urlparse
 from datetime import datetime
 
-VERSION = "3.0.1"
+VERSION = "3.1.0"
 
 # ─── Platform Detection ─────────────────────────────────────────────────────
 
@@ -94,6 +95,80 @@ def _load_template(name: str) -> str:
         with open(path, "r", encoding="utf-8") as f:
             _template_cache[name] = f.read()
     return _template_cache[name]
+
+
+def _is_claude_cli_process(command: str) -> bool:
+    """Return True if the command string looks like an interactive Claude CLI process."""
+    # Must contain 'claude' somewhere
+    if "claude" not in command.lower():
+        return False
+    # Exclude non-CLI processes
+    excludes = [
+        ".vscode", "Claude.app", "Claude Helper", "claude-remote-hub",
+        "ttyd", "--print", "claude_", "/Claude/", "electron",
+        "node ", "python ", "python3 ",
+    ]
+    for ex in excludes:
+        if ex in command:
+            return False
+    # Must look like the CLI binary (ends with /claude or is just "claude" with args)
+    parts = command.split()
+    if not parts:
+        return False
+    bin_part = parts[0]
+    basename = os.path.basename(bin_part)
+    return basename == "claude"
+
+
+def _get_process_cwd(pid: int) -> Optional[str]:
+    """Get the current working directory of a process."""
+    if PLATFORM == "darwin":
+        lsof = shutil.which("lsof") or "/usr/sbin/lsof"
+        if not os.path.exists(lsof):
+            return None
+        try:
+            out = subprocess.check_output(
+                [lsof, "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                text=True, stderr=subprocess.DEVNULL
+            )
+            for line in out.strip().split("\n"):
+                if line.startswith("n") and line != "n":
+                    return line[1:]
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+    else:
+        # Linux: /proc/<pid>/cwd symlink
+        try:
+            return os.readlink(f"/proc/{pid}/cwd")
+        except (FileNotFoundError, PermissionError, OSError):
+            pass
+    return None
+
+
+def _find_latest_session_id(cwd: str) -> Optional[str]:
+    """Find the most recent Claude session ID for a given project directory."""
+    # Claude stores sessions in ~/.claude/projects/<key>/<session_id>.jsonl
+    # The key is the absolute path with / replaced by -
+    claude_dir = os.path.expanduser("~/.claude/projects")
+    if not os.path.isdir(claude_dir):
+        return None
+
+    # Convert CWD to Claude's project key format: /Users/x/proj -> -Users-x-proj
+    project_key = cwd.replace("/", "-")
+    if project_key.startswith("-"):
+        pass  # expected
+    project_dir = os.path.join(claude_dir, project_key)
+
+    if not os.path.isdir(project_dir):
+        return None
+
+    # Find the most recent .jsonl file
+    jsonl_files = _glob.glob(os.path.join(project_dir, "*.jsonl"))
+    if not jsonl_files:
+        return None
+
+    latest = max(jsonl_files, key=os.path.getmtime)
+    return os.path.splitext(os.path.basename(latest))[0]
 
 
 def port_for_name(name: str) -> int:
@@ -219,6 +294,96 @@ def get_sessions() -> list[dict]:
         return []
 
 
+def discover_capturable_sessions() -> list:
+    """Find Claude CLI processes running outside the hub's tmux sessions."""
+    # Step 1: Get PIDs of all tmux pane processes (these are managed by us)
+    tmux_pids: set = set()
+    try:
+        out = subprocess.check_output(
+            [TMUX_BIN, "list-panes", "-a", "-F", "#{pane_pid}"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        for line in out.strip().split("\n"):
+            if line.strip().isdigit():
+                tmux_pids.add(int(line.strip()))
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    # Also collect all descendant PIDs of tmux panes
+    tmux_tree_pids: set = set(tmux_pids)
+    if tmux_pids:
+        try:
+            ps_out = subprocess.check_output(
+                ["ps", "-eo", "pid,ppid"], text=True, stderr=subprocess.DEVNULL
+            )
+            # Build parent->children map
+            children_map: dict = {}
+            for line in ps_out.strip().split("\n")[1:]:
+                parts = line.split()
+                if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+                    child_pid = int(parts[0])
+                    parent_pid = int(parts[1])
+                    children_map.setdefault(parent_pid, []).append(child_pid)
+            # BFS to find all descendants
+            queue = list(tmux_pids)
+            while queue:
+                p = queue.pop(0)
+                for child in children_map.get(p, []):
+                    if child not in tmux_tree_pids:
+                        tmux_tree_pids.add(child)
+                        queue.append(child)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+    # Step 2: List all processes
+    try:
+        ps_out = subprocess.check_output(
+            ["ps", "-eo", "pid,ppid,tty,command"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    capturable = []
+    for line in ps_out.strip().split("\n")[1:]:
+        parts = line.split(None, 3)
+        if len(parts) < 4:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+
+        tty = parts[2]
+        command = parts[3]
+
+        # Skip processes inside tmux
+        if pid in tmux_tree_pids:
+            continue
+
+        # Check if this is a Claude CLI process
+        if not _is_claude_cli_process(command):
+            continue
+
+        # Get CWD
+        cwd = _get_process_cwd(pid)
+        if not cwd:
+            continue
+
+        project_name = os.path.basename(cwd)
+        session_id = _find_latest_session_id(cwd)
+
+        capturable.append({
+            "pid": pid,
+            "tty": tty,
+            "cwd": cwd,
+            "project_name": project_name,
+            "session_id": session_id,
+        })
+
+    return capturable
+
+
 def get_folders(rel_path: str = "") -> dict:
     """List subdirectories under DEV_ROOT for the folder picker."""
     base = os.path.realpath(DEV_ROOT)
@@ -254,6 +419,36 @@ def get_folders(rel_path: str = "") -> dict:
     }
 
 
+def _start_ttyd(session: str, port: int) -> None:
+    """Start a ttyd process attached to a tmux session if not already running."""
+    if port_in_use(port):
+        return
+    ttyd_cmd = [
+        TTYD_BIN, "-W", "-p", str(port),
+        "--ping-interval", "5",
+        "-t", f"fontSize={FONT_SIZE}",
+        "-t", 'theme={"background":"#0f0f1a","foreground":"#e8e8f0","cursor":"#7c83ff"}',
+        "-t", "titleFixed=Claude Remote Hub",
+    ]
+    # Custom index file for virtual keyboard overlay
+    custom_index = os.path.join(INSTALL_DIR, "ttyd-index.html")
+    if os.path.exists(custom_index):
+        ttyd_cmd += ["-I", custom_index]
+
+    # HTTPS: use certs if available
+    cert_file = os.path.join(INSTALL_DIR, "hub.crt")
+    key_file = os.path.join(INSTALL_DIR, "hub.key")
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ttyd_cmd += ["-S", "-C", cert_file, "-K", key_file]
+
+    ttyd_cmd += ["tmux", "attach-session", "-t", session]
+    subprocess.Popen(
+        ttyd_cmd,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    time.sleep(0.3)
+
+
 def start_session(name: str, directory: Optional[str] = None, skip_permissions: bool = False) -> int:
     """Start a tmux + ttyd session. Returns the assigned port."""
     port = port_for_name(name)
@@ -276,33 +471,53 @@ def start_session(name: str, directory: Optional[str] = None, skip_permissions: 
         subprocess.run([TMUX_BIN, "set-option", "-t", session, "mouse", "on"],
                        capture_output=True)
 
-    if not port_in_use(port):
-        ttyd_cmd = [
-            TTYD_BIN, "-W", "-p", str(port),
-            "--ping-interval", "5",
-            "-t", f"fontSize={FONT_SIZE}",
-            "-t", 'theme={"background":"#0f0f1a","foreground":"#e8e8f0","cursor":"#7c83ff"}',
-            "-t", "titleFixed=Claude Remote Hub",
-        ]
-        # Custom index file for virtual keyboard overlay
-        custom_index = os.path.join(INSTALL_DIR, "ttyd-index.html")
-        if os.path.exists(custom_index):
-            ttyd_cmd += ["-I", custom_index]
-
-        # HTTPS: use certs if available
-        cert_file = os.path.join(INSTALL_DIR, "hub.crt")
-        key_file = os.path.join(INSTALL_DIR, "hub.key")
-        if os.path.exists(cert_file) and os.path.exists(key_file):
-            ttyd_cmd += ["-S", "-C", cert_file, "-K", key_file]
-
-        ttyd_cmd += ["tmux", "attach-session", "-t", session]
-        subprocess.Popen(
-            ttyd_cmd,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        time.sleep(0.3)
-
+    _start_ttyd(session, port)
     return port
+
+
+def capture_session(pid: int, session_id: Optional[str], cwd: str,
+                    name: str, skip_permissions: bool = False) -> tuple:
+    """Capture a running Claude CLI session into a tmux + ttyd session.
+
+    Uses --resume --fork-session to restore the conversation in a new tmux session.
+    Returns the assigned port.
+    """
+    # Ensure unique session name
+    base_name = name
+    suffix = 1
+    while True:
+        session = f"claude-{name}"
+        r = subprocess.run([TMUX_BIN, "has-session", "-t", session],
+                           capture_output=True)
+        if r.returncode != 0:
+            break
+        suffix += 1
+        name = f"{base_name}-{suffix}"
+
+    session = f"claude-{name}"
+    port = port_for_name(name)
+
+    # Build the claude command with --resume or --continue
+    cmd = [TMUX_BIN, "new-session", "-d", "-s", session]
+    if cwd and os.path.isdir(cwd):
+        cmd += ["-c", cwd]
+
+    cmd.append(CLAUDE_BIN)
+    if session_id:
+        cmd += ["--resume", session_id, "--fork-session"]
+    else:
+        cmd.append("--continue")
+    if skip_permissions:
+        cmd.append("--dangerously-skip-permissions")
+
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.5)
+
+    subprocess.run([TMUX_BIN, "set-option", "-t", session, "mouse", "on"],
+                   capture_output=True)
+
+    _start_ttyd(session, port)
+    return port, name
 
 
 def stop_session(name: str) -> None:
@@ -471,6 +686,48 @@ class HubHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache, no-store")
             self.end_headers()
             self.wfile.write(json.dumps({"ready": ready, "port": port}).encode())
+            return
+
+        # API: list capturable sessions (JSON)
+        if path == "/api/capturable":
+            sessions = discover_capturable_sessions()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache, no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps(sessions).encode())
+            return
+
+        # Capture a running Claude CLI session
+        if path == "/capture":
+            try:
+                pid = int(qs.get("pid", [0])[0])
+            except (ValueError, IndexError):
+                pid = 0
+            cwd = qs.get("cwd", [""])[0]
+            session_id = qs.get("session_id", [None])[0]
+            name = qs.get("name", [""])[0]
+            skip_permissions = qs.get("skip_permissions", ["0"])[0] == "1"
+
+            if not pid or not name:
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self.end_headers()
+                return
+
+            # Verify the process still exists
+            try:
+                os.kill(pid, 0)
+            except (ProcessLookupError, PermissionError):
+                self.send_response(302)
+                self.send_header("Location", "/?error=process_gone")
+                self.end_headers()
+                return
+
+            port, final_name = capture_session(pid, session_id, cwd, name, skip_permissions)
+            self.send_response(302)
+            self.send_header("Location", f"/terminal/{final_name}")
+            self.end_headers()
             return
 
         # Download SSL certificate

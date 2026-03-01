@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0-E8734A?style=flat-square" alt="v3.0.0">
+  <img src="https://img.shields.io/badge/version-3.1.0-E8734A?style=flat-square" alt="v3.1.0">
   <img src="https://img.shields.io/badge/python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/macOS-supported-000?style=flat-square&logo=apple&logoColor=white" alt="macOS">
   <img src="https://img.shields.io/badge/Linux-supported-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux">
@@ -31,6 +31,7 @@ Claude Code runs on your computer. It has access to your files, your git repos, 
 - **Your machine** — All files, all repos, all environment variables. Nothing is uploaded to the cloud.
 - **Secure by default** — Runs over [Tailscale](https://tailscale.com), a mesh VPN. No ports exposed to the internet. No accounts to create. Only your devices can connect.
 - **Persistent sessions** — Close your browser, put your phone away. When you come back, everything is exactly where you left it.
+- **Capture running sessions** — Already have Claude Code running in a terminal? Capture it and continue from your phone with full conversation history.
 - **Zero dependencies** — Pure Python stdlib. No frameworks, no build step, no node_modules.
 
 Whether you're reviewing a PR on the couch, fixing a bug from a coffee shop, or pair-programming from your phone on the train — Claude Remote Hub gives you the full CLI experience, anywhere.
@@ -136,20 +137,21 @@ HTTPS is **recommended** for mobile access and **required** for iOS Safari.
 
 ### How to set up
 
-Tailscale provides free HTTPS certificates via Let's Encrypt for all `*.ts.net` domains:
+**Automatic (recommended):** The installer (`install.sh`) automatically requests Tailscale certificates during setup. Just make sure HTTPS is enabled in your Tailscale admin console (DNS → Enable HTTPS) before running the installer.
+
+**Manual setup:** If you skipped HTTPS during install or need to regenerate certificates:
 
 ```bash
 # 1. Enable HTTPS in Tailscale admin console:
 #    DNS → Enable HTTPS
 
-# 2. Generate certificates for your machine
-tailscale cert your-machine.tailnet.ts.net
+# 2. Generate certificates and install them
+sudo tailscale cert \
+  --cert-file ~/.claude-remote-hub/hub.crt \
+  --key-file ~/.claude-remote-hub/hub.key \
+  your-machine.tailnet.ts.net
 
-# 3. Copy to Claude Remote Hub's config directory
-cp your-machine.tailnet.ts.net.crt ~/.claude-remote-hub/hub.crt
-cp your-machine.tailnet.ts.net.key ~/.claude-remote-hub/hub.key
-
-# 4. Restart
+# 3. Restart
 claude-remote-hub restart
 ```
 
@@ -210,6 +212,8 @@ Set these in your shell profile (`~/.bashrc`, `~/.zshrc`) or in the service conf
 | GET | `/api/sessions` | List sessions (JSON) |
 | GET | `/api/ttyd-ready/{name}` | Check if ttyd is ready |
 | GET | `/api/folders?path=` | Browse directories |
+| GET | `/api/capturable` | List capturable CLI sessions (JSON) |
+| GET | `/capture` | Capture a running CLI session |
 | GET | `/cert` | Download SSL certificate |
 | GET | `/icon.png` | App icon |
 | POST | `/api/send-keys/{name}` | Send special key to terminal |
@@ -220,7 +224,7 @@ Set these in your shell profile (`~/.bashrc`, `~/.zshrc`) or in the service conf
 
 ```
 claude-remote-hub/
-├── claude-remote-hub.py              # HTTP server (~600 lines, stdlib only)
+├── claude-remote-hub.py              # HTTP server (~1000 lines, stdlib only)
 ├── templates/
 │   ├── hub.html               # Dashboard (mobile-first, dark theme)
 │   └── terminal.html          # Terminal wrapper + virtual keyboard
